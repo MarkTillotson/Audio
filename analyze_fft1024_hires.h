@@ -68,7 +68,7 @@ public:
   float read(unsigned int binNumber)
   {
     if (binNumber > 511) return 0.0;
-    return (float)(output[binNumber]) / 0x20000000 ;
+    return (float)(output[binNumber]) / 0x40000000 ;
   }
 
   float read(unsigned int binFirst, unsigned int binLast)
@@ -87,7 +87,7 @@ public:
     do {
       sum += output[binFirst++];
     } while (binFirst <= binLast);
-    return sum / 0x20000000 ;
+    return sum / 0x40000000 ;
   }
 
   void averageTogether(uint8_t n)
@@ -122,7 +122,7 @@ private:
   volatile bool outputflag;
   audio_block_t *inputQueueArray[1];
   arm_rfft_instance_q31 fft_inst;
-  int overlap_blocks = total_block / 2 ;
+  int overlap_blocks = 4 ;
 };
 
 #endif
