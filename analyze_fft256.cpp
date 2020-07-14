@@ -46,11 +46,14 @@ static void apply_window_to_fft_buffer(void *buffer, const void *window)
 	int16_t *buf = (int16_t *)buffer;
 	const int16_t *win = (int16_t *)window;;
 
-	for (int i=0; i < 256; i++) {
-		int32_t val = *buf * *win++;
-		//*buf = signed_saturate_rshift(val, 16, 15);
-		*buf = val >> 15;
-		buf += 2;
+	for (int i=0; i < 128; i++)
+	{
+	  int j = 2*i ;
+	  int16_t coeff = *win++ ;
+	  int32_t val = coeff * buf[j] ;
+	  buf[j] = (val + 0x4000) >> 15 ;
+	  val = coeff * buf[510-j] ;
+	  buf[510-j] = (val + 0x4000) >> 15 ;
 	}
 }
 
