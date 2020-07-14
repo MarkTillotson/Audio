@@ -55,13 +55,9 @@ static void apply_window_to_fft_buffer(void * r_buffer, const void *window)
   {
     int16_t coeff = win[i] ;
     int64_t val = buf[i] ;
-    val = ((coeff * val) + 0x4000) >> 15 ;
+    val = (coeff * val + 0x4000) >> 15 ;
     buf[i] = val ;
-    val = buf[1023-i] ;
-    val = ((coeff * val) + 0x4000) >> 15 ;
-    buf[1023-i] = val ;
   }
-
 }
 
 void AudioAnalyzeFFT1024HiRes::update(void)
