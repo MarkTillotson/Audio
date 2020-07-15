@@ -30,6 +30,8 @@
 #include "Arduino.h"
 #include "AudioStream.h"
 #include "arm_math.h"
+#include "fft_windows.h"
+
 
 #if AUDIO_BLOCK_SAMPLES != 128
 #error "Code assumes 2^7 samples per block"
@@ -38,12 +40,11 @@
 class AudioAnalyzeFFT : public AudioStream
 {
 public:
-  AudioAnalyzeFFT (int _N) : AudioStream (1, inputQueueArray)
+  AudioAnalyzeFFT (unsigned int N) : AudioStream (1, inputQueueArray)
   {
     state = 0 ;
     outputflag = false ;
     
-    N = _N ;
     total_blocks = N / AUDIO_BLOCK_SAMPLES ;
     overlap_blocks = total_blocks >> 1 ;
     if (arm_rfft_init_q31 (&fft_inst, N, 0, 1) != ARM_MATH_SUCCESS)
@@ -52,10 +53,10 @@ public:
       valid = false ;
       return ;
     }
-    output = (int16_t *) malloc ((N / 2 + 1) * sizeof (int16_t)) ;
-    blocklist = (audio_block_t *) malloc (total_blocks) ;
-    r_buffer = (int16_t *) malloc (N * sizeof (int16_t)) ;
-    c_buffer = (int16_t *) malloc (2 * N * sizeof (int16_t)) ;
+    output = (uint16_t *) malloc ((N / 2 + 1) * sizeof (int16_t)) ;
+    blocklist = (audio_block_t **) malloc (total_blocks * sizeof (audio_block_t*)) ;
+    r_buffer = (int32_t *) malloc (N * sizeof (int16_t)) ;
+    c_buffer = (int32_t *) malloc (2 * N * sizeof (int16_t)) ;
     window = (int16_t *) malloc (N/2 * sizeof (int16_t)) ;
     if (output == NULL || blocklist == NULL || r_buffer == NULL || c_buffer == NULL || window == NULL)
     {
@@ -63,7 +64,7 @@ public:
       valid = false ;
       return ;
     }
-    fftWindow (hanning_window) ;  // default window
+    fftWindow (&hann_window) ;  // default window
     valid = true ;
   }
   
@@ -104,9 +105,15 @@ public:
   
   void fftWindow (FFTWindow * window_desc)
   {
-    window_desc.expand_q16 (window, N) ;
+    window_desc->expand_q15 (window, N) ;
   }
-  
+
+  void overlapBlocks (unsigned int blocks)
+  {
+    blocks %= (N / AUDIO_BLOCK_SAMPLES) ;
+    overlap_blocks = blocks ;
+  }
+
   virtual void update(void);
   uint16_t * output ;
 
@@ -117,10 +124,11 @@ protected:
   
 private:
   void init(void);
+  unsigned int N;
   int16_t * window ;
   audio_block_t ** blocklist ;
-  int16_t * r_buffer ;
-  int16_t * c_buffer ;
+  int32_t * r_buffer ;
+  int32_t * c_buffer ;
   uint8_t state;
   volatile bool outputflag;
   audio_block_t * inputQueueArray [1];

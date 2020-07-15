@@ -32,24 +32,25 @@
 
 void AudioAnalyzeFFT::copy_to_fft_buffer (int blk, const int16_t * src)
 {
-  int16_t * dest = &r_buffer[blk << 7] ;
+  int32_t * dest = &r_buffer[blk << 7] ;
   for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++)
-    *dest++ = *src++ ;
+    *dest++ = (*src++) << 16 ;
 }
 
 void AudioAnalyzeFFT::zero_fft_buffer (int blk)
 {
-  int16_t * dest = &r_buffer[blk << 7] ;
+  int32_t * dest = &r_buffer[blk << 7] ;
   for (int i=0; i < AUDIO_BLOCK_SAMPLES; i++)
-    *dest++ = *src++ ;
+    *dest++ = 0 ;
 }
 
 void AudioAnalyzeFFT::apply_window_to_fft_buffer (void)
 {
-  for (int i=0; i < N/2; i++)
+  for (unsigned int i=0; i < N/2; i++)
   {
-    int32_t product = r_buffer[i] * window_data [i] ;
-    int16_t val = (product + 0x4000) >> 15 ;
+    int64_t product = r_buffer[i] ;
+    product *= window [i] ;
+    int32_t val = (int32_t) ((product + 0x4000) >> 16) ;
     r_buffer[i] = val ;
     r_buffer[N-i-1] = val ;
   }
@@ -67,7 +68,7 @@ void AudioAnalyzeFFT::update(void)
   }
 
 #if defined(__ARM_ARCH_7EM__)
-  copy_to_fft_buffer (buffer + state << 7, block->data) ;
+  copy_to_fft_buffer (state, block->data) ;
   if (state < total_blocks - overlap_blocks)
     release (block) ;
   else
@@ -79,7 +80,7 @@ void AudioAnalyzeFFT::update(void)
 
     arm_rfft_q31 (&fft_inst, r_buffer, c_buffer);
 
-    for (int i=0; i <= N/2; i++)
+    for (unsigned int i=0; i <= N/2; i++)
     {
       float re = c_buffer [2*i] ;
       float im = c_buffer [2*i+1] ;
