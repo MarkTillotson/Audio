@@ -183,6 +183,7 @@ float64_t window_coeffs[] =
   // 31
 } ;
 
+FFTWindow rect_window ("Rect") ;
 FFTWindow hann_window ("Hann", 2, window_coeffs+0) ;
 FFTWindow hamming_window ("Hamming", 2, window_coeffs+2) ;
 FFTWindow blackman_window ("Blackman", 3, window_coeffs+4) ;
@@ -227,6 +228,7 @@ void FFTWindow::register_fft_window (FFTWindow * window)
 
 void register_all_windows ()
 {
+  FFTWindow::register_fft_window (&rect_window) ;
   FFTWindow::register_fft_window (&hann_window) ;
   FFTWindow::register_fft_window (&hamming_window) ;
   FFTWindow::register_fft_window (&blackman_window) ;
@@ -241,7 +243,7 @@ void register_all_windows ()
   FFTWindow::register_fft_window (&hft144d_window) ;
 }
 
-FFTWindow * FFTWindow::get_named_fft_window (const char * name)
+FFTWindow * FFTWindow::fft_window (const char * name)
 {
   if (list_fft_windows == NULL)
     register_all_windows () ;

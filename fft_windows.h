@@ -54,7 +54,7 @@ class FFTWindow
   float32_t processingGain ();
   float32_t noiseBandwidth () ;
   static void register_fft_window (FFTWindow * window) ;
-  static FFTWindow * get_named_fft_window (const char * name) ;
+  static FFTWindow * fft_window (const char * name) ;
 
  private:
   const char * name ;
