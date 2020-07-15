@@ -49,14 +49,14 @@ void AudioAnalyzeFFT::apply_window_to_fft_buffer (void)
   r_buffer[0] = 0 ;
   for (unsigned int i=1; i < N/2; i++)
   {
-    int64_t product = r_buffer[i] ;
-    product *= window [i] ;
-    int32_t val = (int32_t) ((product + 0x4000) >> 16) ;
+    int64_t product = r_buffer[i] ;  // 32 bit signed
+    product *= window [i] ;   // time 16 bit signed
+    int32_t val = (int32_t) ((product + 0x4000) >> 15) ;  // scale back to 32 bits
     r_buffer[i] = val ;
     
     product = r_buffer[N-i] ;
     product *= window [i] ;
-    val = (int32_t) ((product + 0x4000) >> 16) ;
+    val = (int32_t) ((product + 0x4000) >> 15) ;
     r_buffer[N-i] = val ;
   }
 }
@@ -87,10 +87,10 @@ void AudioAnalyzeFFT::update(void)
 
     for (unsigned int i=0; i <= N/2; i++)
     {
-      float re = c_buffer [2*i] ;
-      float im = c_buffer [2*i+1] ;
+      float re = (c_buffer [2*i]   / 0x7fffffff) ;
+      float im = (c_buffer [2*i+1] / 0x7fffffff) ;
       float mag = sqrt (re * re + im * im) ;
-      output[i] = int (round (mag)) ;
+      output[i] = int (round (mag * 0x7fff)) ;
     }
     outputflag = true;
 

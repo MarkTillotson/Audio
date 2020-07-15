@@ -83,7 +83,7 @@ public:
   {
     if (binNumber > N/2)
       return 0.0;
-    return (float) output[binNumber] / 0x40000000 ;
+    return (float) output[binNumber] / processing_gain / 0x40000000 ;
   }
   
   float read (unsigned int binFirst, unsigned int binLast)
@@ -104,7 +104,7 @@ public:
       sum += output [binFirst++] ;
     } while (binFirst <= binLast) ;
     
-    return (float) sum / 0x40000000 ;
+    return (float) sum / processing_gain / 0x40000000 ;
   }
   
   void fftWindow (FFTWindow * window_desc)
@@ -112,6 +112,8 @@ public:
     Serial.printf ("exp %i\n", N) ;
     __disable_irq() ;
     window_desc->expand_q15 (window, N) ;
+    processing_gain = window_desc->processingGain() ;
+    noise_bandwidth = window_desc->noiseBandwidth() ;
     __enable_irq() ;
   }
 
@@ -155,6 +157,8 @@ private:
   uint8_t total_blocks ;
   uint8_t overlap_blocks ;
   volatile bool valid ;
+  volatile float processing_gain ;
+  volatile float noise_bandwidth ;
 };
 
 #endif
