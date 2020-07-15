@@ -96,7 +96,7 @@ void FFTWindow::expand_float (float32_t * buffer, int N)
     sum += 2*val ;
     sumsq += 2*val*val ;
     buffer[i] = val ;
-    buffer[N - i] = val ;
+    //buffer[N - i] = val ;
   }
 
   val = calc (0.5) ;
@@ -126,7 +126,7 @@ void FFTWindow::expand_q31 (int32_t * buffer, int N)
     sumsq += 2*val*val ;
     int32_t ival = (int32_t) int (round (val * 0x7fffffff)) ;
     buffer[i] = ival ;
-    buffer[N - i] = ival ;
+    //buffer[N - i] = ival ;
   }
 
   buffer[N/2] = 0x7fffffff ;
@@ -153,7 +153,7 @@ void FFTWindow::expand_q15 (int16_t * buffer, int N)
     sumsq += 2*val*val ;
     int16_t ival = (int16_t) int (round (val * 0x7fff)) ;
     buffer[i] = ival ;
-    buffer[N - i] = ival ;
+    //buffer[N - i] = ival ;
   }
 
   buffer[N/2] = 0x7fff ;
@@ -183,6 +183,7 @@ float64_t window_coeffs[] =
   // 31
 } ;
 
+FFTWindow rect_window ("Rect") ;
 FFTWindow hann_window ("Hann", 2, window_coeffs+0) ;
 FFTWindow hamming_window ("Hamming", 2, window_coeffs+2) ;
 FFTWindow blackman_window ("Blackman", 3, window_coeffs+4) ;
@@ -190,7 +191,7 @@ FFTWindow flattop_window ("Flattop", 5, window_coeffs+7) ;
 FFTWindow blackman_harris_window ("BlackmanHarris", 4, window_coeffs+12) ;
 FFTWindow nuttall_window ("Nuttall", 4, window_coeffs+16) ;
 FFTWindow blackman_nuttall_window ("BlackmanNuttall", 4, window_coeffs+20) ;
-FFTWindow hft144d_window ("HFT144D", 4, window_coeffs+24) ;
+FFTWindow hft144d_window ("HFT144D", 7, window_coeffs+24) ;
 
 float32_t bartlett_fn (float32_t x) { return 1.0 - abs (2*x-1) ; }
 
@@ -227,6 +228,7 @@ void FFTWindow::register_fft_window (FFTWindow * window)
 
 void register_all_windows ()
 {
+  FFTWindow::register_fft_window (&rect_window) ;
   FFTWindow::register_fft_window (&hann_window) ;
   FFTWindow::register_fft_window (&hamming_window) ;
   FFTWindow::register_fft_window (&blackman_window) ;
@@ -241,7 +243,7 @@ void register_all_windows ()
   FFTWindow::register_fft_window (&hft144d_window) ;
 }
 
-FFTWindow * FFTWindow::get_named_fft_window (const char * name)
+FFTWindow * FFTWindow::fft_window (const char * name)
 {
   if (list_fft_windows == NULL)
     register_all_windows () ;

@@ -54,7 +54,7 @@ class FFTWindow
   float32_t processingGain ();
   float32_t noiseBandwidth () ;
   static void register_fft_window (FFTWindow * window) ;
-  static FFTWindow * get_named_fft_window (const char * name) ;
+  static FFTWindow * fft_window (const char * name) ;
 
  private:
   const char * name ;
@@ -69,6 +69,20 @@ class FFTWindow
 
   float32_t calc (float32_t x) ;
 };
+
+extern FFTWindow rect_window ;
+extern FFTWindow hann_window ;
+extern FFTWindow hamming_window ;
+extern FFTWindow blackman_window ;
+extern FFTWindow flattop_window ;
+extern FFTWindow blackman_harris_window ;
+extern FFTWindow nuttall_window ;
+extern FFTWindow blackman_nuttall_window ;
+extern FFTWindow hft144d_window ;
+extern FFTWindow bartlett_window ;
+extern FFTWindow welch_window ;
+extern FFTWindow cosine_window ;
+extern FFTWindow tukey_window ;
 
 
 #endif
