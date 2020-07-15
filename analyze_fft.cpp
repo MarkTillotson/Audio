@@ -46,13 +46,18 @@ void AudioAnalyzeFFT::zero_fft_buffer (int blk)
 
 void AudioAnalyzeFFT::apply_window_to_fft_buffer (void)
 {
-  for (unsigned int i=0; i < N/2; i++)
+  r_buffer[0] = 0 ;
+  for (unsigned int i=1; i < N/2; i++)
   {
     int64_t product = r_buffer[i] ;
     product *= window [i] ;
     int32_t val = (int32_t) ((product + 0x4000) >> 16) ;
     r_buffer[i] = val ;
-    r_buffer[N-i-1] = val ;
+    
+    product = r_buffer[N-i] ;
+    product *= window [i] ;
+    val = (int32_t) ((product + 0x4000) >> 16) ;
+    r_buffer[N-i] = val ;
   }
 }
 
