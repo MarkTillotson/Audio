@@ -191,7 +191,7 @@ FFTWindow flattop_window ("Flattop", 5, window_coeffs+7) ;
 FFTWindow blackman_harris_window ("BlackmanHarris", 4, window_coeffs+12) ;
 FFTWindow nuttall_window ("Nuttall", 4, window_coeffs+16) ;
 FFTWindow blackman_nuttall_window ("BlackmanNuttall", 4, window_coeffs+20) ;
-FFTWindow hft144d_window ("HFT144D", 4, window_coeffs+24) ;
+FFTWindow hft144d_window ("HFT144D", 7, window_coeffs+24) ;
 
 float32_t bartlett_fn (float32_t x) { return 1.0 - abs (2*x-1) ; }
 
