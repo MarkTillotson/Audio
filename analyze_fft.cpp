@@ -87,10 +87,10 @@ void AudioAnalyzeFFT::update(void)
 
     for (unsigned int i=0; i <= N/2; i++)
     {
-      float re = (c_buffer [2*i]   / 0x7fffffff) ;
-      float im = (c_buffer [2*i+1] / 0x7fffffff) ;
-      float mag = sqrt (re * re + im * im) ;
-      output[i] = int (round (mag * 0x7fff)) ;
+      float real = c_buffer [2*i] ;
+      float imag = c_buffer [2*i+1] ;
+      float mag = sqrt (real*real + imag*imag) ;
+      output[i] = int (round (mag)) ;
     }
     outputflag = true;
 
