@@ -40,8 +40,9 @@
 class AudioAnalyzeFFT : public AudioStream
 {
 public:
-  AudioAnalyzeFFT (unsigned int N) : AudioStream (1, inputQueueArray)
+  AudioAnalyzeFFT (unsigned int Npoints) : AudioStream (1, inputQueueArray)
   {
+    N = Npoints ;
     state = 0 ;
     outputflag = false ;
     
@@ -53,19 +54,22 @@ public:
       valid = false ;
       return ;
     }
-    output = (uint16_t *) malloc ((N / 2 + 1) * sizeof (int16_t)) ;
+    output = (uint16_t *) malloc ((N/2+1) * sizeof (int16_t)) ;
     blocklist = (audio_block_t **) malloc (total_blocks * sizeof (audio_block_t*)) ;
-    r_buffer = (int32_t *) malloc (N * sizeof (int16_t)) ;
-    c_buffer = (int32_t *) malloc (2 * N * sizeof (int16_t)) ;
-    window = (int16_t *) malloc (N/2 * sizeof (int16_t)) ;
+    r_buffer = (int32_t *) malloc (N * sizeof (int32_t)) ;
+    c_buffer = (int32_t *) malloc (2 * N * sizeof (int32_t)) ;
+    window = (int16_t *) malloc ((N/2+1) * sizeof (int16_t)) ;
     if (output == NULL || blocklist == NULL || r_buffer == NULL || c_buffer == NULL || window == NULL)
     {
       Serial.println ("malloc failed for AudioAnalyzeFFT") ;
       valid = false ;
       return ;
     }
+    for (int i = 0 ; i < total_blocks ; i++)
+      blocklist[i] = NULL ;
     fftWindow (&hann_window) ;  // default window
     valid = true ;
+    Serial.printf ("Valid fft, N=%i, overlap=%i, total=%i, state=%i\n", N, overlap_blocks, total_blocks, state) ;
   }
   
   bool available()
@@ -105,13 +109,28 @@ public:
   
   void fftWindow (FFTWindow * window_desc)
   {
+    Serial.printf ("exp %i\n", N) ;
+    __disable_irq() ;
     window_desc->expand_q15 (window, N) ;
+    __enable_irq() ;
   }
 
   void overlapBlocks (unsigned int blocks)
   {
     blocks %= (N / AUDIO_BLOCK_SAMPLES) ;
-    overlap_blocks = blocks ;
+    __disable_irq() ;
+    if (overlap_blocks != blocks)
+    {
+      overlap_blocks = blocks ;
+      for (int i = 0 ; i < total_blocks ; i++)
+	if (blocklist[i] != NULL)
+	{
+	  release (blocklist[i]) ;
+	  blocklist[i] = NULL ;
+	}
+    }
+    __enable_irq() ;
+    Serial.printf ("reset blocks, now overlap=%i, total=%i\n", overlap_blocks, total_blocks) ;
   }
 
   virtual void update(void);
@@ -129,13 +148,13 @@ private:
   audio_block_t ** blocklist ;
   int32_t * r_buffer ;
   int32_t * c_buffer ;
-  uint8_t state;
+  volatile uint8_t state;
   volatile bool outputflag;
   audio_block_t * inputQueueArray [1];
   arm_rfft_instance_q31 fft_inst;
-  int total_blocks ;
-  int overlap_blocks ;
-  bool valid ;
+  uint8_t total_blocks ;
+  uint8_t overlap_blocks ;
+  volatile bool valid ;
 };
 
 #endif
