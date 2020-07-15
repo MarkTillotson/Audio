@@ -54,7 +54,7 @@ public:
       valid = false ;
       return ;
     }
-    output = (uint16_t *) malloc ((N/2+1) * sizeof (int16_t)) ;
+    output = (uint32_t *) malloc ((N/2+1) * sizeof (int32_t)) ;
     blocklist = (audio_block_t **) malloc (total_blocks * sizeof (audio_block_t*)) ;
     r_buffer = (int32_t *) malloc (N * sizeof (int32_t)) ;
     c_buffer = (int32_t *) malloc (2 * N * sizeof (int32_t)) ;
@@ -83,7 +83,7 @@ public:
   {
     if (binNumber > N/2)
       return 0.0;
-    return (float) output[binNumber] / processing_gain / 0x40000000 ;
+    return (float) output[binNumber] / 0x40000000 / processing_gain ;
   }
   
   float read (unsigned int binFirst, unsigned int binLast)
@@ -104,12 +104,11 @@ public:
       sum += output [binFirst++] ;
     } while (binFirst <= binLast) ;
     
-    return (float) sum / processing_gain / 0x40000000 ;
+    return (float) sum / 0x40000000 / processing_gain ;
   }
   
   void fftWindow (FFTWindow * window_desc)
   {
-    Serial.printf ("exp %i\n", N) ;
     __disable_irq() ;
     window_desc->expand_q15 (window, N) ;
     processing_gain = window_desc->processingGain() ;
@@ -132,11 +131,10 @@ public:
 	}
     }
     __enable_irq() ;
-    Serial.printf ("reset blocks, now overlap=%i, total=%i\n", overlap_blocks, total_blocks) ;
   }
 
   virtual void update(void);
-  uint16_t * output ;
+  uint32_t * output ;
 
 protected:
   void copy_to_fft_buffer (int blk, const int16_t * src) ;
