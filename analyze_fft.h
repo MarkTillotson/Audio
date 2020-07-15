@@ -40,9 +40,9 @@
 class AudioAnalyzeFFT : public AudioStream
 {
 public:
-  AudioAnalyzeFFT (unsigned int Npoints) : AudioStream (1, inputQueueArray)
+  AudioAnalyzeFFT (unsigned int N_points) : AudioStream (1, inputQueueArray)
   {
-    N = Npoints ;
+    N = N_points ;
     state = 0 ;
     outputflag = false ;
     
@@ -83,7 +83,14 @@ public:
   {
     if (binNumber > N/2)
       return 0.0;
-    return (float) output[binNumber] / 0x40000000 / processing_gain ;
+    return (float) output[binNumber] * processing_gain ; // / 0x40000000 / processing_gain ;
+  }
+
+  float read_noise (unsigned int binNumber)
+  {
+    if (binNumber > N/2)
+      return 0.0;
+    return (float) output[binNumber] * noise_gain ; // / 0x40000000 / noise_gain ;
   }
   
   float read (unsigned int binFirst, unsigned int binLast)
@@ -104,7 +111,7 @@ public:
       sum += output [binFirst++] ;
     } while (binFirst <= binLast) ;
     
-    return (float) sum / 0x40000000 / processing_gain ;
+    return (float) sum * processing_gain ; // 0x40000000 / processing_gain ;
   }
   
   void fftWindow (FFTWindow * window_desc)
@@ -112,7 +119,10 @@ public:
     __disable_irq() ;
     window_desc->expand_q15 (window, N) ;
     processing_gain = window_desc->processingGain() ;
-    noise_bandwidth = window_desc->noiseBandwidth() ;
+    noise_gain = processing_gain * sqrt (window_desc->noiseBandwidth()) ;
+    // scale for read() methods
+    processing_gain = 1.0 / 0x40000000 / processing_gain ;
+    noise_gain = 1.0 / 0x40000000 / noise_gain ;
     __enable_irq() ;
   }
 
@@ -156,7 +166,7 @@ private:
   uint8_t overlap_blocks ;
   volatile bool valid ;
   volatile float processing_gain ;
-  volatile float noise_bandwidth ;
+  volatile float noise_gain ;
 };
 
 #endif
