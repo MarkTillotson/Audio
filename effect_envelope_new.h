@@ -24,30 +24,25 @@
  * THE SOFTWARE.
  */
 
-#ifndef effect_envelope_h_
-#define effect_envelope_h_
+#ifndef effect_envelope_new_h_
+#define effect_envelope_new_h_
 #include "Arduino.h"
 #include "AudioStream.h"
-#include "utility/dspinst.h"
 #include "effect_envelope.h"
-
-
 
 class AudioEffectEnvelopeNew : public AudioEffectEnvelope
 {
 public:
- AudioEffectEnvelopeNew() : AudioEffectEnvelope()  {}
+  AudioEffectEnvelopeNew() : AudioEffectEnvelope()
+  {
+    smoothed_hires = 0 ;
+  }
 
-  virtual void noteOn(void);
-
-  virtual void noteOff(void);
-
-  virtual void afterTouch(float pressure);
-
+  using AudioEffectEnvelope::release;
   virtual void update(void);
-  
-private:
 
+private:
+  int32_t smoothed_hires; // attenuation, 0=off, 0x40000000=unity gain, exponentially decayed from mult_hires
 };
 
 #endif
