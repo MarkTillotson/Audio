@@ -57,9 +57,8 @@ class AudioSynthCoupledSine : public AudioStream
 public:
   AudioSynthCoupledSine (void) : AudioStream(0, NULL)
   {
-    amplitud = 0.999 ;
+    amplitud = 0 ;
     frequency (1000) ;
-    phase (0) ;
   }
 
   void frequency (float Hz) ;
@@ -69,6 +68,8 @@ public:
   virtual void update (void) ;
 
 private:
+  void set_phase (float phase) ;
+  
   float freq ;
   float amplitud ;
   float halfomega ;

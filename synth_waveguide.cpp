@@ -213,22 +213,27 @@ void AudioSynthWaveguideSineFloat::update ()
 void AudioSynthCoupledSine::frequency (float f)
 {
   if (f < 0)     f = 0 ;
-  if (f > 20000) f = 20000 ;
+  if (f > 18000) f = 18000 ;
 
   float new_hw = M_PI * f / AUDIO_SAMPLE_RATE_EXACT ;
-  int32_t new_e = int (float (ONE * sin (new_hw))) ;
-  // make phase-continuous (assuming amplitude unchanged)
+  int32_t new_e = int (round (ONE * sin (new_hw))) ;
+
   __disable_irq() ;
+  // make phase-continuous (assuming amplitude unchanged)
+  float z = (y - x * sin(halfomega)) / cos(halfomega) ;
+  float phase = atan2 (z, x) ;
+  
   freq = f ;
   halfomega = new_hw ;
   e = new_e ;
+  set_phase (phase) ;
   __enable_irq() ;
 }
 
 void AudioSynthCoupledSine::amplitude (float amp)
 {
   if (amp < 0.0) amp = 0.0 ;
-  if (amp > 0.999) amp = 0.999 ;
+  if (amp > 0.97) amp = 0.97 ;
 
   float scale = AMP * amp ;
 
@@ -236,17 +241,19 @@ void AudioSynthCoupledSine::amplitude (float amp)
   if (amplitud == 0)
   {
     x = 0 ;
-    y = cos (halfomega) ;
+    y = int (round (scale * cos (halfomega))) ;
   }
   else
   {
     x = int (round (x * amp / amplitud)) ;
     y = int (round (y * amp / amplitud)) ;
+    /*
     float energy = (float)x*x + (float)y*y ;
     energy /= scale*scale ;
     float correction = 1.0 / energy ;
     x = int (round (x * correction)) ;
     y = int (round (y * correction)) ;
+    */
   }
   amplitud = amp ;
   __enable_irq() ;
@@ -255,15 +262,16 @@ void AudioSynthCoupledSine::amplitude (float amp)
 void AudioSynthCoupledSine::phase (float degrees)
 {
   float phase = degrees * M_PI / 180 ;
-  float xx = cos (phase) ;
-  float yy = sin (phase + halfomega) ;
-
-  float scale = AMP * amplitud ;
-
   __disable_irq() ;
-  x = int (round (scale * xx)) ;
-  y = int (round (scale * yy)) ;
+  set_phase (phase) ;
   __enable_irq() ;
+}
+
+void AudioSynthCoupledSine::set_phase (float phase)
+{
+  float scale = AMP * amplitud ;
+  x = int (round (scale * cos (phase))) ;
+  y = int (round (scale * sin (phase + halfomega))) ;
 }
 
 void AudioSynthCoupledSine::update ()
