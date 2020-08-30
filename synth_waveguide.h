@@ -9,7 +9,7 @@ class AudioSynthWaveguideSine : public AudioStream
 public:
   AudioSynthWaveguideSine (void) : AudioStream(0, NULL)
   {
-    amplitud = 1.0 ;
+    amplitud = 0.995 ;
     frequency (1000) ;
     phase (0) ;
   }
@@ -33,7 +33,7 @@ class AudioSynthWaveguideSineFloat : public AudioStream
 public:
   AudioSynthWaveguideSineFloat (void) : AudioStream(0, NULL)
   {
-    amplitud = 0.995 * 32768 ;
+    amplitud = 0.999 ;
     frequency (1000) ;
     phase (0) ;
   }
@@ -49,6 +49,30 @@ private:
   float amplitud ;
   float Cn ;
   float d0, d1 ;
+};
+
+
+class AudioSynthCoupledSine : public AudioStream
+{
+public:
+  AudioSynthCoupledSine (void) : AudioStream(0, NULL)
+  {
+    amplitud = 0.999 ;
+    frequency (1000) ;
+    phase (0) ;
+  }
+
+  void frequency (float Hz) ;
+  void amplitude (float amp) ;
+  void phase (float degrees) ;
+
+  virtual void update (void) ;
+
+private:
+  float freq ;
+  float amplitud ;
+  float halfomega ;
+  int32_t x, y, e ;
 };
 
 #endif
