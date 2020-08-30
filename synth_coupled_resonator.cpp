@@ -26,7 +26,7 @@
 void AudioSynthCoupledSine::frequency (float f)
 {
   if (f < 0)     f = 0 ;
-  if (f > 18000) f = 18000 ;   // Some stability issues at highest frequencies so limit to about 80% of Nyquist
+  if (f > 20000) f = 20000 ;
 
   float new_hw = M_PI * f / AUDIO_SAMPLE_RATE_EXACT ;
   int32_t new_e = int (round (ONE * sin (new_hw))) ;  // should be 2 * sin (new_hw), but scaled in the update loop
