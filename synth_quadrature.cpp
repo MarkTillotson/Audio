@@ -40,8 +40,8 @@
  */
 
 
-#define AMP 0x10000000   // amplitude of x, y 
-#define ONE 0x80000000   // amplitude of e/2
+#define AMP 0x1000000   // amplitude of x, y 
+#define ONE 0x10000000   // amplitude of k1, k2
 
 
 void AudioSynthQuadrature::frequency (float f)
@@ -50,22 +50,37 @@ void AudioSynthQuadrature::frequency (float f)
   if (f > 20000) f = 20000 ;
 
   float new_hw = M_PI * f / AUDIO_SAMPLE_RATE_EXACT ;
-  int32_t new_k1 = int (round (ONE * tan (new_hw))) ;  // should be 2 * sin (new_hw), but scaled in the update loop
+  int32_t new_k1 = int (round (ONE * tan (new_hw))) ;
   int32_t new_k2 = int (round (ONE * sin (2*new_hw))) ;
 
   __disable_irq() ;
-  // make phase-continuous (assuming amplitude unchanged)
-  w = 2*new_hw ;
+  // automatically phase-continuous
   k1 = new_k1 ;
   k2 = new_k2 ;
-  d = multiply_32x32_rshift32 (k1, y) << 1 ;
+  d  = multiply_32x32_rshift32 (k1, y<<4) ;
   __enable_irq() ;
 }
 
+void AudioSynthQuadrature::agc (void)
+{
+  if (amplitud == 0.0)
+    return ;
+  int64_t xx = x ;
+  int64_t yy = y ;
+  int64_t en = xx*xx + yy*yy ;
+  int64_t target = fabs (amplitud) * AMP ;
+  int32_t amp_error = (en - target*target) / (2 * target) ;
+
+  x -= (xx * amp_error / AMP) ;
+  y -= (yy * amp_error / AMP) ;
+  d  = multiply_32x32_rshift32 (k1, y<<4) ;
+}
+  
+
 void AudioSynthQuadrature::amplitude (float amp)
 {
-  if (amp < 0.0) amp = 0.0 ;
-  if (amp > 0.97) amp = 0.97 ;
+  if (amp < -0.9999)    amp = -0.9999 ;
+  if (amp > 0.9999) amp = 0.9999 ;
 
   float scale = AMP * amp ;
 
@@ -114,14 +129,15 @@ void AudioSynthQuadrature::update ()
 
   int16_t * xdata = xblock->data ;
   int16_t * ydata = yblock->data ;
+  agc() ;  // keep amplitude from drifting
 
   for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES ; i++)
   {
-    *xdata++ = (int16_t) ((x+0x1000) >> 13) ;
-    *ydata++ = (int16_t) ((y+0x1000) >> 13) ;
+    *xdata++ = (int16_t) ((x+0x100) >> 9) ;
+    *ydata++ = (int16_t) ((y+0x100) >> 9) ;
     x -= d ;
-    y += multiply_32x32_rshift32 (k2, x) << 1 ;
-    d  = multiply_32x32_rshift32 (k1, y) << 1 ;
+    y += multiply_32x32_rshift32 (k2, x<<4) ;
+    d  = multiply_32x32_rshift32 (k1, y<<4) ;
     x -= d ;
   }
 
