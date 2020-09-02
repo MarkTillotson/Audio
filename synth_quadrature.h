@@ -7,6 +7,9 @@
 
 /* Full quadrature generator
  *
+ * Outputs quadrature on two output streams, cosine and sine respectively
+ * using method described below.
+ *
  * Copyright (c) 2020, Mark Tillotson
  *
  *
@@ -39,7 +42,9 @@
  *
  *  https://vicanek.de/articles/QuadOsc.pdf
  *
- *  (x, y) are in quadrature
+ *  (x, y) are in exact quadrature.
+ *  an agc is implemented to stabilize against drift in amplitude.  The agc is applied once per
+ *  block to reduce overhead.
  */
 
 
