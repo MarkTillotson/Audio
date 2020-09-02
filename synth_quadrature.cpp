@@ -2,7 +2,11 @@
 #include <math.h>
 #include "synth_quadrature.h"
 
-/* Quadrature generator
+
+/* Full quadrature generator
+ *
+ * Outputs quadrature on two output streams, cosine and sine respectively
+ * using method described below.
  *
  * Copyright (c) 2020, Mark Tillotson
  *
@@ -36,12 +40,14 @@
  *
  *  https://vicanek.de/articles/QuadOsc.pdf
  *
- *  (x, y) are in quadrature
+ *  (x, y) are in exact quadrature.
+ *  an agc is implemented to stabilize against drift in amplitude.  The agc is applied once per
+ *  block to reduce overhead.
  */
 
 
 #define AMP 0x1000000   // amplitude of x, y 
-#define ONE 0x10000000   // amplitude of k1, k2
+#define ONE 0x10000000  // amplitude of k1, k2
 
 
 void AudioSynthQuadrature::frequency (float f)
