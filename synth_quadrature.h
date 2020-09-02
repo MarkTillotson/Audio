@@ -59,10 +59,10 @@ public:
   virtual void update (void) ;
 
 private:
+  void agc (void) ;
   void set_phase (float phase) ;
   
   float amplitud ;
-  float w ;
   int32_t x, y, d, k1, k2 ;
 };
 
