@@ -46,4 +46,17 @@ private:
 	static audio_block_t *block_left;
 };
 
+
+
+class AudioConvertRawPDM : public AudioStream
+{
+public:
+  AudioConvertRawPDM (void): AudioStream (1, inputQueueArray) {}
+  virtual void update (void) ;
+
+private:
+  audio_block_t * inputQueueArray [1] ;
+};
+
+
 #endif

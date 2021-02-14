@@ -54,7 +54,6 @@
 // of Cascaded Integrator Comb (CIC) or moving average filters.
 
 DMAMEM __attribute__((aligned(32))) static uint32_t pdm_buffer[AUDIO_BLOCK_SAMPLES*4];
-static uint32_t leftover[14];
 audio_block_t * AudioInputPDMRaw::block_left = NULL;
 bool AudioInputPDMRaw::update_responsibility = false;
 DMAChannel AudioInputPDMRaw::dma(false);
@@ -169,6 +168,17 @@ void AudioInputPDMRaw::begin(void)
 	dma.attachInterrupt(isr);
 }
 
+extern const int8_t discrep_table [256] ;
+
+static uint8_t count (uint16_t bits)
+{
+  int8_t c0 = discrep_table [bits >> 8] ;
+  int8_t c1 = discrep_table [bits & 0xFF] ;
+  c0 += c1 ;
+  return (uint8_t) (c0 == 8 ? 7 : c0) ;
+}
+
+
 void AudioInputPDMRaw::isr(void)
 {
 	uint32_t daddr;
@@ -209,15 +219,6 @@ void AudioInputPDMRaw::isr(void)
 	//digitalWriteFast(3, LOW);
 }
 
-uint8_t count (uint16_t bits)
-{
-  int8_t c0 = discrep_table [bits >> 8] ;
-  int8_t c1 = discrep_table [bits & 0xFF] ;
-  c0 += c1 ;
-  return (uint8_t) (c0 == 8 ? 7 : c0) ;
-}
-
-
 void AudioInputPDMRaw::update(void)
 {
 	audio_block_t *new_left, *out_left;
@@ -232,7 +233,7 @@ void AudioInputPDMRaw::update(void)
 	}
 }
 
-const uint8_t discrep_table [256] =
+const int8_t discrep_table [256] =
   {
     -4, -3, -3, -2, -3, -2, -2, -1, -3, -2, -2, -1, -2, -1, -1,  0,
     -3, -2, -2, -1, -2, -1, -1,  0, -2, -1, -1,  0, -1,  0,  0, +1,
@@ -253,5 +254,35 @@ const uint8_t discrep_table [256] =
      0, +1, +1, +2, +1, +2, +2, +3, +1, +2, +2, +3, +2, +3, +3, +4
   };
 
+
+
+
+void AudioConvertRawPDM::update (void)
+{
+  audio_block_t * in = receiveReadOnly (0) ;
+  if (in == NULL)
+    return ;
+  audio_block_t * out = allocate () ;
+  if (out == NULL)
+  {
+    release (in) ;
+    return ;
+  }
+  {
+    int16_t * src = in->data ;
+    int16_t * dst = out->data ;
+    for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES ; i++)
+    {
+      int16_t b = *src++ ;
+      if (b & 0x8)
+	*dst++ = ((b & 15)-16) << 12 ;
+      else
+	*dst++ = (b & 15) << 12 ;
+    }
+  }
+  release (in) ;
+  transmit (out) ;
+  release (out) ;
+}
 
 #endif
