@@ -193,23 +193,30 @@ void AudioInputPDMRaw::isr(void)
 	if (update_responsibility) AudioStream::update_all();
 	left = block_left;
 	if (left != NULL) {
-		// TODO: should find a way to pass the unfiltered data to
-		// the lower priority update.  This burns ~40% of the CPU
-		// time in a high priority interrupt.  Not ideal.  :(
 		int16_t *dest = left->data;
-		for (unsigned int i=0; i < 14; i += 2) {
-			*dest++ = filter(leftover + i, 7 - (i >> 1), src);
-		}
-		for (unsigned int i=0; i < AUDIO_BLOCK_SAMPLES*2-14; i += 2) {
-			*dest++ = filter(src + i);
-		}
-		for (unsigned int i=0; i < 14; i++) {
-			leftover[i] = src[AUDIO_BLOCK_SAMPLES*2 - 14 + i];
+		for (unsigned int i = 0 ; i < AUDIO_BLOCK_SAMPLES*2 ; i += 2)
+		{
+		  uint32_t word0 = src[i] ;
+		  uint8_t s0 = count (word0 >> 16) ;
+		  uint8_t s1 = count (word0 & 0xFFFF) ;
+		  uint32_t word1 = src[i+1] ;
+		  uint8_t s2 = count (word1 >> 16) ;
+		  uint8_t s3 = count (word1 & 0xFFFF) ;
+		  *dest++ = (s0 << 12) | (s1 << 8) | (s2 << 4) | s3 ;
 		}
 		//left->data[0] = 0x7FFF;
 	}
 	//digitalWriteFast(3, LOW);
 }
+
+uint8_t count (uint16_t bits)
+{
+  int8_t c0 = discrep_table [bits >> 8] ;
+  int8_t c1 = discrep_table [bits & 0xFF] ;
+  c0 += c1 ;
+  return (uint8_t) (c0 == 8 ? 7 : c0) ;
+}
+
 
 void AudioInputPDMRaw::update(void)
 {
@@ -224,5 +231,27 @@ void AudioInputPDMRaw::update(void)
 		release(out_left);
 	}
 }
+
+const uint8_t discrep_table [256] =
+  {
+    -4, -3, -3, -2, -3, -2, -2, -1, -3, -2, -2, -1, -2, -1, -1,  0,
+    -3, -2, -2, -1, -2, -1, -1,  0, -2, -1, -1,  0, -1,  0,  0, +1,
+    -3, -2, -2, -1, -2, -1, -1,  0, -2, -1, -1,  0, -1,  0,  0, +1,
+    -2, -1, -1,  0, -1,  0,  0, +1, -1,  0,  0, +1,  0, +1, +1, +2,
+    -3, -2, -2, -1, -2, -1, -1,  0, -2, -1, -1,  0, -1,  0,  0, +1,
+    -2, -1, -1,  0, -1,  0,  0, +1, -1,  0,  0, +1,  0, +1, +1, +2,
+    -2, -1, -1,  0, -1,  0,  0, +1, -1,  0,  0, +1,  0, +1, +1, +2,
+    -1,  0,  0, +1,  0, +1, +1, +2,  0, +1, +1, +2, +1, +2, +2, +3,
+    
+    -3, -2, -2, -1, -2, -1, -1,  0, -2, -1, -1,  0, -1,  0,  0, +1,
+    -2, -1, -1,  0, -1,  0,  0, +1, -1,  0,  0, +1,  0, +1, +1, +2,
+    -2, -1, -1,  0, -1,  0,  0, +1, -1,  0,  0, +1,  0, +1, +1, +2,
+    -1,  0,  0, +1,  0, +1, +1, +2,  0, +1, +1, +2, +1, +2, +2, +3,
+    -2, -1, -1,  0, -1,  0,  0, +1, -1,  0,  0, +1,  0, +1, +1, +2,
+    -1,  0,  0, +1,  0, +1, +1, +2,  0, +1, +1, +2, +1, +2, +2, +3,
+    -1,  0,  0, +1,  0, +1, +1, +2,  0, +1, +1, +2, +1, +2, +2, +3,
+     0, +1, +1, +2, +1, +2, +2, +3, +1, +2, +2, +3, +2, +3, +3, +4
+  };
+
 
 #endif
