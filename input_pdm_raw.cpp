@@ -273,11 +273,13 @@ void AudioConvertRawPDM::update (void)
     int16_t * dst = out->data ;
     for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES ; i++)
     {
-      int16_t b = *src++ ;
+      int32_t b = *src++ ;
       if (b & 0x8)
-	*dst++ = ((b & 15)-16) << 12 ;
+	sum += ((b & 15)-16) << 20 ;
       else
-	*dst++ = (b & 15) << 12 ;
+	sum += (b & 15) << 20 ;
+      *dst++ = (int16_t) (sum >> 16) ;
+      sum -= (sum+2048) >> 12 ;
     }
   }
   release (in) ;

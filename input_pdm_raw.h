@@ -51,11 +51,16 @@ private:
 class AudioConvertRawPDM : public AudioStream
 {
 public:
-  AudioConvertRawPDM (void): AudioStream (1, inputQueueArray) {}
+  AudioConvertRawPDM (void): AudioStream (1, inputQueueArray)
+  {
+    sum = 0 ;
+  }
+  
   virtual void update (void) ;
 
 private:
   audio_block_t * inputQueueArray [1] ;
+  int32_t sum ;
 };
 
 
