@@ -35,15 +35,27 @@
 class AudioInputPDMRaw : public AudioStream
 {
 public:
-	AudioInputPDMRaw(void) : AudioStream(0, NULL) { begin(); }
-	virtual void update(void);
-	void begin(void);
+  AudioInputPDMRaw(void) : AudioStream(0, NULL)
+  {
+    begin();
+  }
+
+  virtual void update(void);
+  void begin(void);
+
 protected:	
-	static bool update_responsibility;
-	static DMAChannel dma;
-	static void isr(void);
+  static bool update_responsibility;
+  static DMAChannel dma;
+  static void isr(void);
+
 private:
-	static audio_block_t *block_left;
+  static int16_t cicfilt (uint16_t b);
+  static audio_block_t *block0;
+  static audio_block_t *block1;
+  static audio_block_t *block2;
+  static audio_block_t *block3;
+  static uint32_t a1, a2, a3, a4, a5 ;  // integrators
+  static uint32_t d1, d2, d3, d4, d5 ;  // differentiators
 };
 
 
@@ -51,7 +63,7 @@ private:
 class AudioConvertRawPDM : public AudioStream
 {
 public:
-  AudioConvertRawPDM (void): AudioStream (1, inputQueueArray)
+  AudioConvertRawPDM (void): AudioStream (4, inputQueueArray)
   {
     sum = 0 ;
   }
@@ -59,7 +71,7 @@ public:
   virtual void update (void) ;
 
 private:
-  audio_block_t * inputQueueArray [1] ;
+  audio_block_t * inputQueueArray [4] ;
   int32_t sum ;
 };
 
