@@ -49,31 +49,51 @@ protected:
   static void isr(void);
 
 private:
-  static int16_t cicfilt (uint16_t b);
   static audio_block_t *block0;
   static audio_block_t *block1;
   static audio_block_t *block2;
   static audio_block_t *block3;
-  static uint32_t a1, a2, a3, a4, a5 ;  // integrators
-  static uint32_t d1, d2, d3, d4, d5 ;  // differentiators
 };
 
 
 
-class AudioConvertRawPDM : public AudioStream
+class AudioConvertFromPDM : public AudioStream
 {
 public:
-  AudioConvertRawPDM (void): AudioStream (4, inputQueueArray)
+  AudioConvertFromPDM (void): AudioStream (4, inputQueueArray)
   {
     sum = 0 ;
+    del1 = 0 ;
+    del2 = 0 ;
   }
   
   virtual void update (void) ;
 
+protected:
+  int16_t cicfilt (uint16_t b);
+
 private:
   audio_block_t * inputQueueArray [4] ;
   int32_t sum ;
+  uint32_t a1, a2, a3, a4, a5 ;  // integrators
+  uint32_t d1, d2, d3, d4, d5 ;  // differentiators
+  int32_t del1, del2 ;
 };
 
+
+class AudioConvertToPDM : public AudioStream
+{
+public:
+  AudioConvertToPDM (void): AudioStream (1, inputQueueArray)
+  {
+    accum = 0 ;
+  }
+
+  virtual void update (void) ;
+
+private:
+  audio_block_t * inputQueueArray [1] ;
+  int32_t accum ;
+};
 
 #endif

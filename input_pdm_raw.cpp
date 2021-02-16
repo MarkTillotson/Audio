@@ -59,18 +59,6 @@ audio_block_t * AudioInputPDMRaw::block1 = NULL;
 audio_block_t * AudioInputPDMRaw::block2 = NULL;
 audio_block_t * AudioInputPDMRaw::block3 = NULL;
 
-uint32_t AudioInputPDMRaw::a1 = 0 ;
-uint32_t AudioInputPDMRaw::a2 = 0 ;
-uint32_t AudioInputPDMRaw::a3 = 0 ;
-uint32_t AudioInputPDMRaw::a4 = 0 ;
-uint32_t AudioInputPDMRaw::a5 = 0 ;
-
-uint32_t AudioInputPDMRaw::d1 = 0 ;
-uint32_t AudioInputPDMRaw::d2 = 0 ;
-uint32_t AudioInputPDMRaw::d3 = 0 ;
-uint32_t AudioInputPDMRaw::d4 = 0 ;
-uint32_t AudioInputPDMRaw::d5 = 0 ;
-
 bool AudioInputPDMRaw::update_responsibility = false;
 DMAChannel AudioInputPDMRaw::dma(false);
 
@@ -185,6 +173,90 @@ void AudioInputPDMRaw::begin(void)
 }
 
 
+
+void AudioInputPDMRaw::isr(void)
+{
+  uint32_t daddr;
+  const uint32_t *src;
+  audio_block_t * blk0, * blk1, * blk2, * blk3 ;
+  
+#if defined(KINETISK)
+  daddr = (uint32_t)(dma.TCD->DADDR);
+#endif
+  dma.clearInterrupt();
+
+  if (daddr < (uint32_t)pdm_buffer + sizeof(pdm_buffer) / 2)
+    // DMA is receiving to the first half of the buffer; need to remove data from the second half
+    src = pdm_buffer + AUDIO_BLOCK_SAMPLES*2;
+  else
+    // DMA is receiving to the second half of the buffer; need to remove data from the first half
+    src = pdm_buffer;
+
+  
+  if (update_responsibility)
+    AudioStream::update_all();
+  
+  blk0 = block0 ;
+  blk1 = block1 ;
+  blk2 = block2 ;
+  blk3 = block3 ;
+
+  if (blk0 != NULL && blk1 != NULL && blk2 != NULL && blk3 != NULL)
+  {
+    int16_t * dst0 = blk0->data;
+    int16_t * dst1 = blk1->data;
+    int16_t * dst2 = blk2->data;
+    int16_t * dst3 = blk3->data;
+    for (unsigned int i = 0 ; i < AUDIO_BLOCK_SAMPLES*2 ; i += 2)
+    {
+      uint32_t word0 = src[i] ;
+      uint32_t word1 = src[i+1] ;
+      *dst0++ = word0 >> 16 ;
+      *dst1++ = word0 & 0xFFFF ;
+      *dst2++ = word1 >> 16 ;
+      *dst3++ = word1 & 0xFFFF ;
+    }
+  }
+}
+
+void AudioInputPDMRaw::update(void)
+{
+  // allocate new set of buffers
+  audio_block_t * new_blk0 = allocate();
+  audio_block_t * new_blk1 = allocate();
+  audio_block_t * new_blk2 = allocate();
+  audio_block_t * new_blk3 = allocate();
+
+  // allocate issue?  abandon
+  if (new_blk0 == NULL || new_blk1 == NULL || new_blk2 == NULL || new_blk3 == NULL)
+  {
+    if (new_blk0) release (new_blk0) ;
+    if (new_blk1) release (new_blk1) ;
+    if (new_blk2) release (new_blk2) ;
+    if (new_blk3) release (new_blk3) ;
+    return ;
+  }
+
+  // swap buffers
+  __disable_irq();
+  audio_block_t * out_blk0 = block0 ;  block0 = new_blk0 ;
+  audio_block_t * out_blk1 = block1 ;  block1 = new_blk1 ;
+  audio_block_t * out_blk2 = block2 ;  block2 = new_blk2 ;
+  audio_block_t * out_blk3 = block3 ;  block3 = new_blk3 ;
+  __enable_irq();
+
+  // transmit buffers and release
+  if (out_blk0)  { transmit(out_blk0, 0); release(out_blk0); }
+  if (out_blk1)  { transmit(out_blk1, 1); release(out_blk1); }
+  if (out_blk2)  { transmit(out_blk2, 2); release(out_blk2); }
+  if (out_blk3)  { transmit(out_blk3, 3); release(out_blk3); }
+
+}
+
+
+
+
+
 extern const int16_t lo_table_acc1 [256];
 extern const int16_t lo_table_acc2 [256];
 extern const int16_t lo_table_acc3 [256];
@@ -198,7 +270,7 @@ extern const int16_t hi_table_acc4 [256];
 extern const int16_t hi_table_acc5 [256];
 
 
-static inline int16_t AudioInputPDMRaw::cicfilt (uint16_t b)
+inline int16_t AudioConvertFromPDM::cicfilt (uint16_t b)
 {
   uint16_t hi = b >> 8 ;
   uint16_t lo = b & 0xFF ;
@@ -247,103 +319,18 @@ static inline int16_t AudioInputPDMRaw::cicfilt (uint16_t b)
   uint32_t t5 = t4 - d5 ;
   d5 = t4 ;
 
-  return (int16_t) (((int32_t) t5) >> 3) ;
+  return (int16_t) (((int32_t) t5) >> 5) ;
 }
-
-
-void AudioInputPDMRaw::isr(void)
-{
-  uint32_t daddr;
-  const uint32_t *src;
-  audio_block_t * blk0, * blk1, * blk2, * blk3 ;
-
-  digitalWriteFast(3, HIGH);
-  
-#if defined(KINETISK)
-  daddr = (uint32_t)(dma.TCD->DADDR);
-#endif
-  dma.clearInterrupt();
-
-  if (daddr < (uint32_t)pdm_buffer + sizeof(pdm_buffer) / 2)
-    // DMA is receiving to the first half of the buffer; need to remove data from the second half
-    src = pdm_buffer + AUDIO_BLOCK_SAMPLES*2;
-  else
-    // DMA is receiving to the second half of the buffer; need to remove data from the first half
-    src = pdm_buffer;
-
-  
-  if (update_responsibility)
-    AudioStream::update_all();
-  
-  blk0 = block0 ;
-  blk1 = block1 ;
-  blk2 = block2 ;
-  blk3 = block3 ;
-
-  int16_t temp = 0 ;
-  if (blk0 != NULL && blk1 != NULL && blk2 != NULL && blk3 != NULL)
-  {
-    int16_t * dst0 = blk0->data;
-    int16_t * dst1 = blk1->data;
-    int16_t * dst2 = blk2->data;
-    int16_t * dst3 = blk3->data;
-    for (unsigned int i = 0 ; i < AUDIO_BLOCK_SAMPLES*2 ; i += 2)
-    {
-      uint32_t word0 = src[i] ;
-      *dst0++ = cicfilt (word0 >> 16) ;
-      *dst1++ = cicfilt (word0 & 0xFFFF) ;
-      uint32_t word1 = src[i+1] ;
-      *dst2++ = cicfilt (word1 >> 16) ;
-      *dst3++ = cicfilt (word1 & 0xFFFF) ;
-    }
-    digitalWriteFast (3, LOW) ;
-  }
-
-  //digitalWriteFast(3, ((temp >> 14) ^ (temp >> 15)) & 1);
-}
-
-void AudioInputPDMRaw::update(void)
-{
-  // allocate new set of buffers
-  audio_block_t * new_blk0 = allocate();
-  audio_block_t * new_blk1 = allocate();
-  audio_block_t * new_blk2 = allocate();
-  audio_block_t * new_blk3 = allocate();
-
-  // allocate issue?  abandon
-  if (new_blk0 == NULL || new_blk1 == NULL || new_blk2 == NULL || new_blk3 == NULL)
-  {
-    if (new_blk0) release (new_blk0) ;
-    if (new_blk1) release (new_blk1) ;
-    if (new_blk2) release (new_blk2) ;
-    if (new_blk3) release (new_blk3) ;
-    return ;
-  }
-
-  // swap buffers
-  __disable_irq();
-  audio_block_t * out_blk0 = block0 ;  block0 = new_blk0 ;
-  audio_block_t * out_blk1 = block1 ;  block1 = new_blk1 ;
-  audio_block_t * out_blk2 = block2 ;  block2 = new_blk2 ;
-  audio_block_t * out_blk3 = block3 ;  block3 = new_blk3 ;
-  __enable_irq();
-
-  // transmit buffers and release
-  if (out_blk0)  { transmit(out_blk0, 0); release(out_blk0); }
-  if (out_blk1)  { transmit(out_blk1, 1); release(out_blk1); }
-  if (out_blk2)  { transmit(out_blk2, 2); release(out_blk2); }
-  if (out_blk3)  { transmit(out_blk3, 3); release(out_blk3); }
-
-}
-
 
 #define FO 8
 #define FF 4
 
 
 // Class to pull in 4 samples and decimate by a further factor of 4
-void AudioConvertRawPDM::update (void)
+void AudioConvertFromPDM::update (void)
 {
+
+  digitalWriteFast(3, HIGH);
   audio_block_t * in0 = receiveReadOnly (0) ;
   audio_block_t * in1 = receiveReadOnly (1) ;
   audio_block_t * in2 = receiveReadOnly (2) ;
@@ -372,15 +359,44 @@ void AudioConvertRawPDM::update (void)
   // simple 1st order low pass
   for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES ; i++)
   {
-    sum += *src0++ ;
+    /*
+    sum += cicfilt (*src0++) ;
     sum -= (sum+FO) >> FF ;
-    sum += *src1++ ;
+    sum += cicfilt (*src1++) ;
     sum -= (sum+FO) >> FF ;
-    sum += *src2++ ;
+    sum += cicfilt (*src2++) ;
     sum -= (sum+FO) >> FF ;
-    sum += *src3++ ;
+    sum += cicfilt (*src3++) ;
     sum -= (sum+FO) >> FF ;
     int16_t sample = (int16_t) (sum >> FF) ;
+    */
+
+    // [2, 0, -10, 0, 41, 0, -122, 0, 306, 0, -678, 0, 1404, 0, -3019, 0, 10269, 16384, 10269, 0, -3019, 0, 1404, 0, -678, 0, 306, 0, -122, 0, 41, 0, -10, 0, 2]
+    //
+    
+    // IIR compensation filter,  1 / (z^2 - 1.5z + 0.75)  (poles   0.75 +/-  0.433j)
+    
+    int32_t t ;
+    t = cicfilt (*src0++) << 8 ;
+    t += 3 * (del1+del1-del2) >> 2 ;
+    del2 = del1 ;    del1 = t ;
+    
+    t = cicfilt (*src1++) << 8 ;
+    t += 3 * (del1+del1-del2) >> 2 ;
+    del2 = del1 ;    del1 = t ;
+    
+    t = cicfilt (*src2++) << 8 ;
+    t += 3 * (del1+del1-del2) >> 2 ;
+    del2 = del1 ;    del1 = t ;
+    
+    t = cicfilt (*src3++) << 8 ;
+    t += 3 * (del1+del1-del2) >> 2 ;
+    del2 = del1 ;    del1 = t ;
+
+
+    
+    int16_t sample = (int16_t) (t>>10) ;
+      
     *dst++ = sample ;
   }
   release (in0) ;
@@ -389,7 +405,73 @@ void AudioConvertRawPDM::update (void)
   release (in3) ;
   transmit (out) ;
   release (out) ;
+
+  digitalWriteFast(3, LOW);
 }
+
+
+
+void AudioConvertToPDM::update (void)
+{
+  digitalWriteFast(3, HIGH);
+
+  audio_block_t * in = receiveReadOnly (0) ;
+  if (in == NULL)
+    return ;
+  audio_block_t * out0 = allocate () ;
+  audio_block_t * out1 = allocate () ;
+  audio_block_t * out2 = allocate () ;
+  audio_block_t * out3 = allocate () ;
+  if (out0 == NULL || out1 == NULL || out2 == NULL || out3 == NULL)
+  {
+    release (in) ;
+    if (out0) release (out0) ;
+    if (out1) release (out1) ;
+    if (out2) release (out2) ;
+    if (out3) release (out3) ;
+    return ;
+  }
+
+  int16_t * src = in->data ;
+  int16_t * dests[4] ;
+  dests[0] = out0->data ;
+  dests[1] = out1->data ;
+  dests[2] = out2->data ;
+  dests[3] = out3->data ;
+
+  for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES ; i++)
+  {
+    int32_t curr = ((int32_t) src[i]) << (16 - 6) ; 
+    for (int j = 0 ; j < 4 ; j++)
+    {
+      uint16_t bits = 0 ;
+      for (int k = 0 ; k < 16 ; k++)
+      {
+	accum += curr;
+	if (accum >= 0)
+	{
+	  accum -= (0x8000 << (16-6)) ;
+	  bits = (bits << 1) | 1 ;
+	}
+	else
+	{
+	  accum += (0x8000 << (16-6)) ;
+	  bits = bits << 1 ;
+	}
+      }
+      *(dests[j])++ = (int16_t) bits ;
+    }
+  }
+
+  release (in) ;
+  transmit (out0, 0) ;  release (out0) ;
+  transmit (out1, 1) ;  release (out1) ;
+  transmit (out2, 2) ;  release (out2) ;
+  transmit (out3, 3) ;  release (out3) ;
+
+  digitalWriteFast(3, LOW);
+}
+
 
 const int16_t lo_table_acc1 [256] =
 {
