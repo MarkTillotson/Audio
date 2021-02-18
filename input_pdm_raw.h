@@ -57,6 +57,23 @@ private:
 
 
 
+class AudioConvertFromPDMOld : public AudioStream
+{
+public:
+  AudioConvertFromPDMOld (void): AudioStream (4, inputQueueArray)
+  {
+  }
+  
+  virtual void update (void) ;
+
+protected:
+
+
+private:
+  audio_block_t * inputQueueArray [4] ;
+};
+
+
 class AudioConvertFromPDM : public AudioStream
 {
 public:
@@ -65,9 +82,16 @@ public:
     sum = 0 ;
     del1 = 0 ;
     del2 = 0 ;
+    gain_factor = 0 ;
+    dc_offset = 0 ;
   }
   
   virtual void update (void) ;
+
+  void set_gain_factor (int gf)
+  {
+    gain_factor = gf < 0 ? 0 : gf > 7 ? 7 : gf ;
+  }
 
 protected:
   int16_t cicfilt (uint16_t b);
@@ -78,7 +102,10 @@ private:
   uint32_t a1, a2, a3, a4, a5 ;  // integrators
   uint32_t d1, d2, d3, d4, d5 ;  // differentiators
   int32_t del1, del2 ;
+  int gain_factor ;
+  int32_t dc_offset ;
 };
+
 
 
 class AudioConvertToPDM : public AudioStream

@@ -29,29 +29,7 @@
  
 #include <Arduino.h>
 #include "input_pdm_raw.h"
-//#include "utility/dspinst.h"
-
-// Decrease this for more mic gain, increase for range to accommodate loud sounds
-//#define RSHIFT  2
-
-// Pulse Density Modulation (PDM) is a tech trade-off of questionable value.
-// The only advantage is your delta-sigma based ADC can be less expensive,
-// since it can omit the digital low-pass filter.  But it limits the ADC
-// to a single bit modulator, and it imposes the filtering requirement onto
-// your microcontroller.  Generally digital filtering is much less expensive
-// to implement with dedicated digital logic than firmware in a general
-// purpose microcontroller.  PDM probably makes more sense with an ASIC or
-// highly integrated SoC, or maybe even with a "real" DSP chip.  Using a
-// microcontroller, maybe not so much?
-//
-// This code imposes considerable costs.  It consumes 39% of the CPU time
-// when running at 96 MHz, and uses 2104 bytes of RAM for buffering and 32768
-// bytes of flash for a large table lookup to optimize the filter computation.
-//
-// On the plus side, this filter is a 512 tap FIR with approximately +/- 1 dB
-// gain flatness to 10 kHz bandwidth.  That won't impress any audio enthusiasts,
-// but its performance should be *much* better than the rapid passband rolloff
-// of Cascaded Integrator Comb (CIC) or moving average filters.
+#include "utility/dspinst.h"
 
 DMAMEM __attribute__((aligned(32))) static uint32_t pdm_buffer[AUDIO_BLOCK_SAMPLES*4];
 audio_block_t * AudioInputPDMRaw::block0 = NULL;
@@ -61,6 +39,7 @@ audio_block_t * AudioInputPDMRaw::block3 = NULL;
 
 bool AudioInputPDMRaw::update_responsibility = false;
 DMAChannel AudioInputPDMRaw::dma(false);
+
 
 // MCLK needs to be 48e6 / 1088 * 256 = 11.29411765 MHz -> 44.117647 kHz sample rate
 //
@@ -255,8 +234,6 @@ void AudioInputPDMRaw::update(void)
 
 
 
-
-
 extern const int16_t lo_table_acc1 [256];
 extern const int16_t lo_table_acc2 [256];
 extern const int16_t lo_table_acc3 [256];
@@ -329,8 +306,8 @@ inline int16_t AudioConvertFromPDM::cicfilt (uint16_t b)
 // Class to pull in 4 samples and decimate by a further factor of 4
 void AudioConvertFromPDM::update (void)
 {
-
   digitalWriteFast(3, HIGH);
+  
   audio_block_t * in0 = receiveReadOnly (0) ;
   audio_block_t * in1 = receiveReadOnly (1) ;
   audio_block_t * in2 = receiveReadOnly (2) ;
@@ -347,8 +324,6 @@ void AudioConvertFromPDM::update (void)
   audio_block_t * out = allocate () ;
   if (out == NULL)
     return ;
-  //if (in1) digitalWriteFast(3, LOW);
-
 
   int16_t * src0 = in0->data ;
   int16_t * src1 = in1->data ;
@@ -359,21 +334,6 @@ void AudioConvertFromPDM::update (void)
   // simple 1st order low pass
   for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES ; i++)
   {
-    /*
-    sum += cicfilt (*src0++) ;
-    sum -= (sum+FO) >> FF ;
-    sum += cicfilt (*src1++) ;
-    sum -= (sum+FO) >> FF ;
-    sum += cicfilt (*src2++) ;
-    sum -= (sum+FO) >> FF ;
-    sum += cicfilt (*src3++) ;
-    sum -= (sum+FO) >> FF ;
-    int16_t sample = (int16_t) (sum >> FF) ;
-    */
-
-    // [2, 0, -10, 0, 41, 0, -122, 0, 306, 0, -678, 0, 1404, 0, -3019, 0, 10269, 16384, 10269, 0, -3019, 0, 1404, 0, -678, 0, 306, 0, -122, 0, 41, 0, -10, 0, 2]
-    //
-    
     // IIR compensation filter,  1 / (z^2 - 1.5z + 0.75)  (poles   0.75 +/-  0.433j)
     
     int32_t t ;
@@ -393,11 +353,22 @@ void AudioConvertFromPDM::update (void)
     t += 3 * (del1+del1-del2) >> 2 ;
     del2 = del1 ;    del1 = t ;
 
-
-    
-    int16_t sample = (int16_t) (t>>10) ;
-      
-    *dst++ = sample ;
+    // deal with DC offset using 1st order IIR
+    t -= dc_offset ;
+    dc_offset += (t + (1 << 11)) >> 12 ;
+    // efficient saturating shift to set gain
+    switch (gain_factor)
+    {
+      case 0: *dst++ = signed_saturate_rshift (t, 16, 10) ; break ;
+      case 1: *dst++ = signed_saturate_rshift (t, 16, 9) ; break ;
+      case 2: *dst++ = signed_saturate_rshift (t, 16, 8) ; break ;
+      case 3: *dst++ = signed_saturate_rshift (t, 16, 7) ; break ;
+      case 4: *dst++ = signed_saturate_rshift (t, 16, 6) ; break ;
+      case 5: *dst++ = signed_saturate_rshift (t, 16, 5) ; break ;
+      case 6: *dst++ = signed_saturate_rshift (t, 16, 4) ; break ;
+      case 7: *dst++ = signed_saturate_rshift (t, 16, 3) ; break ;
+      default:	break ;
+    }
   }
   release (in0) ;
   release (in1) ;
@@ -673,5 +644,167 @@ const int16_t hi_table_acc5 [256] =
   7560, 8550, 8990, 9980, 9562, 10552, 10992, 11982, 10290, 11280, 11720, 12710, 12292, 13282, 13722, 14712, 
 };
 
+
+
+// Decrease this for more mic gain, increase for range to accommodate loud sounds
+#define RSHIFT  2
+
+// Pulse Density Modulation (PDM) is a tech trade-off of questionable value.
+// The only advantage is your delta-sigma based ADC can be less expensive,
+// since it can omit the digital low-pass filter.  But it limits the ADC
+// to a single bit modulator, and it imposes the filtering requirement onto
+// your microcontroller.  Generally digital filtering is much less expensive
+// to implement with dedicated digital logic than firmware in a general
+// purpose microcontroller.  PDM probably makes more sense with an ASIC or
+// highly integrated SoC, or maybe even with a "real" DSP chip.  Using a
+// microcontroller, maybe not so much?
+//
+// This code imposes considerable costs.  It consumes 39% of the CPU time
+// when running at 96 MHz, and uses 2104 bytes of RAM for buffering and 32768
+// bytes of flash for a large table lookup to optimize the filter computation.
+//
+// On the plus side, this filter is a 512 tap FIR with approximately +/- 1 dB
+// gain flatness to 10 kHz bandwidth.  That won't impress any audio enthusiasts,
+// but its performance should be *much* better than the rapid passband rolloff
+// of Cascaded Integrator Comb (CIC) or moving average filters.
+
+static uint16_t leftover[2*14];
+
+extern const int16_t enormous_pdm_filter_table[16384];
+
+static int filter (uint16_t * buf0, uint16_t * buf1, uint16_t * buf2, uint16_t * buf3)
+{
+  const int16_t * table = enormous_pdm_filter_table;
+  int32_t sum = 0;
+  uint32_t count = 8;
+  do {
+    uint16_t data0 = *buf0++;
+    uint16_t data1 = *buf1++;
+    uint16_t data2 = *buf2++;
+    uint16_t data3 = *buf3++;
+    sum += table[data0 >> 8];
+    table += 256;
+    sum += table[data0 & 255];
+    table += 256;
+    sum += table[data1 >> 8];
+    table += 256;
+    sum += table[data1 & 255];
+    table += 256;
+    sum += table[data2 >> 8];
+    table += 256;
+    sum += table[data2 & 255];
+    table += 256;
+    sum += table[data3 >> 8];
+    table += 256;
+    sum += table[data3 & 255];
+    table += 256;
+    
+  } while (--count > 0);
+  return signed_saturate_rshift(sum, 16, RSHIFT);
+}
+
+static int filter (uint16_t *buf, unsigned int n, uint16_t *buf0, uint16_t *buf1, uint16_t *buf2, uint16_t *buf3)
+{
+  const int16_t * table = enormous_pdm_filter_table;
+  int32_t sum = 0;
+  uint32_t count = 8 - n;
+  do {
+    uint16_t data0 = *buf++;
+    uint16_t data1 = *buf++;
+    uint16_t data2 = *buf++;
+    uint16_t data3 = *buf++;
+    sum += table[data0 >> 8];
+    table += 256;
+    sum += table[data0 & 255];
+    table += 256;
+    sum += table[data1 >> 8];
+    table += 256;
+    sum += table[data1 & 255];
+    table += 256;
+    sum += table[data2 >> 8];
+    table += 256;
+    sum += table[data2 & 255];
+    table += 256;
+    sum += table[data3 >> 8];
+    table += 256;
+    sum += table[data3 & 255];
+    table += 256;
+  } while (--n > 0);
+  do {
+    uint16_t data0 = *buf0++;
+    uint16_t data1 = *buf1++;
+    uint16_t data2 = *buf2++;
+    uint16_t data3 = *buf3++;
+    sum += table[data0 >> 8];
+    table += 256;
+    sum += table[data0 & 255];
+    table += 256;
+    sum += table[data1 >> 8];
+    table += 256;
+    sum += table[data1 & 255];
+    table += 256;
+    sum += table[data2 >> 8];
+    table += 256;
+    sum += table[data2 & 255];
+    table += 256;
+    sum += table[data3 >> 8];
+    table += 256;
+    sum += table[data3 & 255];
+    table += 256;
+
+  } while (--count > 0);
+  return signed_saturate_rshift(sum, 16, RSHIFT);
+}
+
+void AudioConvertFromPDMOld::update (void)
+{
+  digitalWrite (3, HIGH) ;
+  audio_block_t * in0 = receiveReadOnly (0) ;
+  audio_block_t * in1 = receiveReadOnly (1) ;
+  audio_block_t * in2 = receiveReadOnly (2) ;
+  audio_block_t * in3 = receiveReadOnly (3) ;
+  if (in0 == NULL || in0 == NULL || in0 == NULL || in0 == NULL)
+  {
+    if (in0) release (in0) ;
+    if (in1) release (in1) ;
+    if (in2) release (in2) ;
+    if (in3) release (in3) ;
+    return ;
+  }
+  audio_block_t * out = allocate () ;
+  if (out == NULL)
+    return ;
+
+  
+  int16_t * dest = out->data;
+  uint16_t * src0 = (uint16_t *) (in0->data);
+  uint16_t * src1 = (uint16_t *) (in1->data);
+  uint16_t * src2 = (uint16_t *) (in2->data);
+  uint16_t * src3 = (uint16_t *) (in3->data);
+
+  for (unsigned int i=0; i < 14; i += 2)   // is 14 right, or should it be 28 now?
+  {
+    *dest++ = filter (leftover + (i<<1), 7 - (i>>1), src0, src1, src2, src3);
+  }
+  for (unsigned int i=0; i < AUDIO_BLOCK_SAMPLES-7; i += 1)
+  {
+    *dest++ = filter(src0+i, src1+i, src2+i, src3+i);
+  }
+  for (unsigned int i=0; i < 7; i++)
+  {
+    int off = i << 2 ;
+    leftover[off]   = src0 [AUDIO_BLOCK_SAMPLES + i-7];
+    leftover[off+1] = src1 [AUDIO_BLOCK_SAMPLES + i-7];
+    leftover[off+2] = src2 [AUDIO_BLOCK_SAMPLES + i-7];
+    leftover[off+3] = src3 [AUDIO_BLOCK_SAMPLES + i-7];
+  }
+  release (in0) ;
+  release (in1) ;
+  release (in2) ;
+  release (in3) ;
+  transmit (out) ;
+  release (out) ;
+  digitalWrite (3, LOW) ;
+}
 
 #endif
