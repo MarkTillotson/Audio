@@ -252,20 +252,20 @@ inline int16_t AudioConvertFromPDM::cicfilt (uint16_t b)
   uint16_t hi = b >> 8 ;
   uint16_t lo = b & 0xFF ;
 
-  // aggregated effect of 5 integrators clocked 16 times
+  // aggregated effect of 5 integrators clocked 16 times, keeping inputs at zero
   a2 += (a1 << 4) ;
   a3 += (a2 << 4) - 120 * a1 ;
   a4 += (a3 << 4) - 120 * a2 + 560 * a1 ;
   a5 += (a4 << 4) - 120 * a3 + 560 * a2 - 1820 * a1 ;
 
-  // linearly combined with the effect of the incoming bits, pretabulated.
+  // linearly combined with the effect of the incoming bits, pretabulated for each byte
   a1 += lo_table_acc1 [lo] + hi_table_acc1 [hi] ;
   a2 += lo_table_acc2 [lo] + hi_table_acc2 [hi] ;
   a3 += lo_table_acc3 [lo] + hi_table_acc3 [hi] ;
   a4 += lo_table_acc4 [lo] + hi_table_acc4 [hi] ;
   a5 += lo_table_acc5 [lo] + hi_table_acc5 [hi] ;
 
-  /*  The slower way running all the integrators 16 times explicitly.
+  /*  The equivalent, slower, way running all the integrators 16 times explicitly.
   for (int shft = 14 ; shft >= 0 ; shft --)
   {
     a1 += ((b >> shft) & 2) - 1 ;
@@ -282,9 +282,9 @@ inline int16_t AudioConvertFromPDM::cicfilt (uint16_t b)
   a5 += a4 ;
   */
   
-  // now implicitly downsample by 16
+  // now implicitly downsample by 16 since we get a uint16 as input
 
-  // and differentiate
+  // and now 5 differentiators
   uint32_t t1 = a5 - d1 ;
   d1 = a5 ;
   uint32_t t2 = t1 - d2 ;
@@ -296,7 +296,7 @@ inline int16_t AudioConvertFromPDM::cicfilt (uint16_t b)
   uint32_t t5 = t4 - d5 ;
   d5 = t4 ;
 
-  return (int16_t) (((int32_t) t5) >> 5) ;
+  return (int16_t) (((int32_t) t5) >> 5) ;  // scaling by 2^5 since sinc^5
 }
 
 #define FO 8
@@ -307,11 +307,13 @@ inline int16_t AudioConvertFromPDM::cicfilt (uint16_t b)
 void AudioConvertFromPDM::update (void)
 {
   digitalWriteFast(3, HIGH);
-  
-  audio_block_t * in0 = receiveReadOnly (0) ;
+
+  // 4 input channels to get 64 bits per audio sample time as PDM running 64 x oversampled
+  audio_block_t * in0 = receiveReadOnly (0) ;  // first bit is top bit of in0
   audio_block_t * in1 = receiveReadOnly (1) ;
   audio_block_t * in2 = receiveReadOnly (2) ;
-  audio_block_t * in3 = receiveReadOnly (3) ;
+  audio_block_t * in3 = receiveReadOnly (3) ;  // last bit is bottom bit of in3
+  // housekeeping / failsafe
   if (in0 == NULL || in1 == NULL || in2 == NULL || in3 == NULL)
   {
     if (in0) release (in0) ;
@@ -320,7 +322,6 @@ void AudioConvertFromPDM::update (void)
     if (in3) release (in3) ;
     return ;
   }
-
   audio_block_t * out = allocate () ;
   if (out == NULL)
     return ;
@@ -334,12 +335,12 @@ void AudioConvertFromPDM::update (void)
   // simple 1st order low pass
   for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES ; i++)
   {
-    // IIR compensation filter,  1 / (z^2 - 1.5z + 0.75)  (poles   0.75 +/-  0.433j)
+    // IIR sinc5-compensation filter,  1 / (z^2 - 1.5z + 0.75)  (poles   0.75 +/-  0.433j)
     
     int32_t t ;
-    t = cicfilt (*src0++) << 8 ;
+    t = cicfilt (*src0++) << 8 ;   // process 4 CIC outputs scaled to 24 bits with 8 guard bits
     t += 3 * (del1+del1-del2) >> 2 ;
-    del2 = del1 ;    del1 = t ;
+    del2 = del1 ;    del1 = t ;    // due to pole gain result is 26ish bits
     
     t = cicfilt (*src1++) << 8 ;
     t += 3 * (del1+del1-del2) >> 2 ;
@@ -353,23 +354,30 @@ void AudioConvertFromPDM::update (void)
     t += 3 * (del1+del1-del2) >> 2 ;
     del2 = del1 ;    del1 = t ;
 
+    // implicit down-sample by factor of 4
+
+    // TODO: add a low-grade filter, downsample by 2,
+    //       then decent half-band filter and final downsample by 2
+
     // deal with DC offset using 1st order IIR
     t -= dc_offset ;
     dc_offset += (t + (1 << 11)) >> 12 ;
     // efficient saturating shift to set gain
+    // alas the shift amount is an immediate (constant) field in the DSP instruction...
     switch (gain_factor)
     {
-      case 0: *dst++ = signed_saturate_rshift (t, 16, 10) ; break ;
-      case 1: *dst++ = signed_saturate_rshift (t, 16, 9) ; break ;
-      case 2: *dst++ = signed_saturate_rshift (t, 16, 8) ; break ;
-      case 3: *dst++ = signed_saturate_rshift (t, 16, 7) ; break ;
-      case 4: *dst++ = signed_saturate_rshift (t, 16, 6) ; break ;
-      case 5: *dst++ = signed_saturate_rshift (t, 16, 5) ; break ;
-      case 6: *dst++ = signed_saturate_rshift (t, 16, 4) ; break ;
-      case 7: *dst++ = signed_saturate_rshift (t, 16, 3) ; break ;
-      default:	break ;
+    case 0: *dst++ = signed_saturate_rshift (t, 16, 10) ; break ; // reduce nominal 26ish bits to 16
+    case 1: *dst++ = signed_saturate_rshift (t, 16, 9) ;  break ; // x 2
+    case 2: *dst++ = signed_saturate_rshift (t, 16, 8) ;  break ; // x 4
+    case 3: *dst++ = signed_saturate_rshift (t, 16, 7) ;  break ; // etc
+    case 4: *dst++ = signed_saturate_rshift (t, 16, 6) ;  break ;
+    case 5: *dst++ = signed_saturate_rshift (t, 16, 5) ;  break ;
+    case 6: *dst++ = signed_saturate_rshift (t, 16, 4) ;  break ;
+    case 7: *dst++ = signed_saturate_rshift (t, 16, 3) ;  break ;
+    default:  break ;
     }
   }
+  // housekeeping
   release (in0) ;
   release (in1) ;
   release (in2) ;
