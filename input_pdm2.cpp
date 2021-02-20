@@ -224,21 +224,22 @@ public:
     FIR_type1 (_half_taps * 2, _coeffs, _shift)
   {}
 
-  void insert (int16_t in)
+  inline void insert (int16_t in)
   {
     *inptr++ = in ;
     fptr++ ;
 
     if (inptr >= & buffer[2*full_taps])
     {
-      for (int i = 0 ; i < full_taps ; i++)
+      int count = full_taps ;
+      do
       {
 	*(--fptr) = *(--inptr) ;
-      }
+      } while (--count > 0) ;
     }
   }
 
-  int16_t eval (void)
+  inline int16_t eval (void)
   {
     int16_t * ap = fptr ;
     int16_t * bp = inptr-1 ;
@@ -266,49 +267,52 @@ public:
     byte_count = _byte_count ;
     coeffs = _coeffs ;
     shift = _shift ;
-    buffer = new uint16_t [_byte_count] ;
-    inptr = & buffer [_byte_count >> 1] ;
+    buffer = new uint32_t [_byte_count >> 1] ;
+    inptr = & buffer [_byte_count >> 2] ;
     fptr  = & buffer [0] ;
   }
 
-  inline void insert (uint16_t in)
+  inline void insert (uint32_t in)
   {
     *inptr++ = in ;
     fptr++ ;
-    if (inptr >= & buffer [byte_count])
+    if (inptr >= & buffer [byte_count >> 1])
     {
-      for (int i = 0 ; i < byte_count>>1 ; i++)
+      int count = byte_count>>3 ;
+      do
       {
 	*(--fptr) = *(--inptr) ;
-      }
+	*(--fptr) = *(--inptr) ;
+      } while (--count > 0);
     }
   }
 
   inline int16_t eval (void)
   {
-    uint16_t * ap = fptr ;
+    uint32_t * ap = fptr ;
     int32_t out = 0 ;
     const int32_t * co = coeffs ;
-    
-    for (int i = 0 ; i < byte_count>>1 ; i++)
+
+    int count = byte_count>>2 ;
+    do
     {
-      uint16_t word = *ap++ ;
-      out += co [word >> 8] ;   co += 0x100 ;
-      out += co [word & 0xFF] ; co += 0x100 ;
-    }
+      uint32_t word = *ap++ ;
+      out += co [word >> 24] ;          co += 0x100 ;
+      out += co [(word >> 16) & 0xFF] ; co += 0x100 ;
+      out += co [(word >> 8) & 0xFF] ;  co += 0x100 ;
+      out += co [word & 0xFF] ;         co += 0x100 ;
+    } while (--count > 0) ;
 
     if (shift > 0)
       return (int16_t) (out >> shift) ; // saturated shift?
-    else if (shift < 0)
-      return (int16_t) (out << -shift) ;
     else
-      return (int16_t) out ;
+      return (int16_t) (out << -shift) ;
   }
   
 protected:
   int byte_count ;
-  uint16_t * fptr, * inptr ;
-  uint16_t * buffer ;
+  uint32_t * fptr, * inptr ;
+  uint32_t * buffer ;
   const int32_t * coeffs ;
   int shift ;
 };
@@ -342,8 +346,7 @@ static FIR_halfband halfband (HALFBAND_TABLE_LEN, halfband_table, HALFBAND_SHIFT
 static inline int filter_fir0 (const uint32_t *buf)
 {
   uint32_t data1 = *buf++;
-  fir0.insert ((uint16_t) (data1 >> 16)) ;
-  fir0.insert ((uint16_t) (data1 & 0xFFFF)) ;
+  fir0.insert (data1) ;
   return fir0.eval () ;
 }
 
@@ -385,8 +388,11 @@ void AudioInputPDM2::isr(void)
     int16_t *dest = left->data;
     for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES*2 ; i += 2)
     {
-      halfband.insert (filter_fir0 (src + i)) ;
-      halfband.insert (filter_fir0 (src + i+1)) ;
+      uint16_t s0 = filter_fir0 (src + i) ;
+      uint16_t s1 = filter_fir0 (src + i+1) ;
+
+      halfband.insert (s0) ;
+      halfband.insert (s1) ;
       *dest++ = halfband.eval () ;
     }
   }
