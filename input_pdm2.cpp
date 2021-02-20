@@ -25,7 +25,8 @@
  */
 
 #if !defined(__IMXRT1052__) && !defined(__IMXRT1062__)
- 
+
+
 #include <Arduino.h>
 #include "input_pdm2.h"
 #include "utility/dspinst.h"
@@ -91,6 +92,7 @@ DMAChannel AudioInputPDM2::dma(false);
 #endif
 #endif
 
+
 void AudioInputPDM2::begin(void)
 {
   dma.begin(true); // Allocate the DMA channel first
@@ -150,7 +152,10 @@ void AudioInputPDM2::begin(void)
   dma.attachInterrupt(isr);
 }
 
+ 
 ////////////////////////////////////////
+
+
 class FIR_type1
 {
 public:
@@ -158,7 +163,6 @@ public:
   {
     half_taps = _half_taps ;
     full_taps = 2 * half_taps - 1;
-    printf ("half taps %i  full taps %i\n", half_taps, full_taps) ;
     coeffs = _coeffs ;
     if (_shift > 15)
     {
@@ -170,24 +174,15 @@ public:
       shift1 = 0 ;
       shift2 = _shift ;
     }
-    printf ("s1  %i  s2 %i\n", shift1, shift2) ;
     buffer = new int16_t [2 * full_taps] ;
     fptr = & buffer[0] ;
     inptr = & buffer[full_taps] ;
   }
 
-  int32_t process (int16_t in)
+  void insert (int16_t in)
   {
-    * inptr = in ;
-    int16_t * ap = ++fptr ;
-    int16_t * bp = inptr++ ;
-    int32_t out = 0 ;
-    
-    for (int i = 0 ; i < half_taps ; i++)
-    {
-      int32_t sum = *ap++ + *bp-- ;
-      out += ((int32_t) (coeffs[i] * sum)) >> shift1 ;
-    }
+    *inptr++ = in ;
+    fptr++ ;
 
     if (inptr >= & buffer[2*full_taps])
     {
@@ -196,8 +191,23 @@ public:
 	*(--fptr) = *(--inptr) ;
       }
     }
+  }
+
+  int16_t eval (void)
+  {
+    int16_t * ap = fptr ;
+    int16_t * bp = inptr-1 ;
+    int32_t out = 0 ;
+    
+    for (int i = 0 ; i < half_taps ; i++)
+    {
+      int32_t sum = *ap++ + *bp-- ;
+      out += ((int32_t) (coeffs[i] * sum)) >> shift1 ;
+    }
+
     return (int16_t) (out >> shift2) ; // saturated?
   }
+
 
 protected:
   int half_taps, full_taps, shift1, shift2 ;
@@ -214,11 +224,24 @@ public:
     FIR_type1 (_half_taps * 2, _coeffs, _shift)
   {}
 
-  int32_t process (int16_t in)
+  void insert (int16_t in)
   {
-    * inptr = in ;
-    int16_t * ap = ++fptr ;
-    int16_t * bp = inptr++ ;
+    *inptr++ = in ;
+    fptr++ ;
+
+    if (inptr >= & buffer[2*full_taps])
+    {
+      for (int i = 0 ; i < full_taps ; i++)
+      {
+	*(--fptr) = *(--inptr) ;
+      }
+    }
+  }
+
+  int16_t eval (void)
+  {
+    int16_t * ap = fptr ;
+    int16_t * bp = inptr-1 ;
     int32_t out = 0 ;
     
     for (int i = 0 ; i < (half_taps>>1) ; i++)
@@ -229,13 +252,6 @@ public:
     }
     out += ((int32_t) (*++bp)) << (shift2-1) ;
 
-    if (inptr >= & buffer[2*full_taps])
-    {
-      for (int i = 0 ; i < full_taps ; i++)
-      {
-	*(--fptr) = *(--inptr) ;
-      }
-    }
     return (int16_t) (out >> shift2) ; // saturated?
   }
   
@@ -255,7 +271,7 @@ public:
     fptr  = & buffer [0] ;
   }
 
-  void insert (uint16_t in)
+  inline void insert (uint16_t in)
   {
     *inptr++ = in ;
     fptr++ ;
@@ -268,7 +284,7 @@ public:
     }
   }
 
-  int16_t eval (void)
+  inline int16_t eval (void)
   {
     uint16_t * ap = fptr ;
     int32_t out = 0 ;
@@ -306,7 +322,7 @@ const int FIR0_BYTES = 32 ;
 const int FIR0_SHIFT = 20-15 ;
 extern const int32_t fir0_table[FIR0_BYTES << 8];
 
-FIR_1bit fir0 (FIR0_BYTES, fir0_table, FIR0_SHIFT) ;
+static FIR_1bit fir0 (FIR0_BYTES, fir0_table, FIR0_SHIFT-4) ;
 
 
 const int HALFBAND_LEN = 63;
@@ -319,16 +335,18 @@ const int16_t halfband_table [HALFBAND_TABLE_LEN] =
      -1,     3,   -13,    38,   -94,   208,  -417,   776, -1357,  2259, -3624,  5682, -8884, 14376, -26365, 
 };
 
-FIR_halfband halfb (HALFBAND_TABLE_LEN, halfband_table, HALFBAND_SHIFT) ;
+static FIR_halfband halfband (HALFBAND_TABLE_LEN, halfband_table, HALFBAND_SHIFT) ;
 
 
-static int filter (const uint32_t *buf)
+ 
+static inline int filter_fir0 (const uint32_t *buf)
 {
   uint32_t data1 = *buf++;
   fir0.insert ((uint16_t) (data1 >> 16)) ;
   fir0.insert ((uint16_t) (data1 & 0xFFFF)) ;
   return fir0.eval () ;
 }
+
 
 
 void AudioInputPDM2::isr(void)
@@ -367,10 +385,9 @@ void AudioInputPDM2::isr(void)
     int16_t *dest = left->data;
     for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES*2 ; i += 2)
     {
-      halfb.insert (filter (src + i)) ;
-      halfb.insert (filter (src + i+1)) ;
-
-      *dest++ = halfb.eval () ;
+      halfband.insert (filter_fir0 (src + i)) ;
+      halfband.insert (filter_fir0 (src + i+1)) ;
+      *dest++ = halfband.eval () ;
     }
   }
   digitalWriteFast (3, LOW);
