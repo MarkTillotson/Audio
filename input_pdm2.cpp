@@ -445,11 +445,8 @@ void AudioInputPDM2::isr(void)
   audio_block_t * left;
 
   digitalWriteFast (14, HIGH);
-#if defined(KINETISK)
+#if defined(KINETISK) || defined(__IMXRT1052__) || defined(__IMXRT1062__)
   daddr = (uint32_t)(dma.TCD->DADDR);
-#elif defined(__IMXRT1052__) || defined(__IMXRT1062__)
-  daddr = (uint32_t)(dma.TCD->DADDR);
-#endif
   dma.clearInterrupt();
 
   if (daddr < (uint32_t)pdm_buffer + sizeof(pdm_buffer) / 2)
@@ -473,7 +470,8 @@ void AudioInputPDM2::isr(void)
     // TODO: should find a way to pass the unfiltered data to
     // the lower priority update.  This burns ~40% of the CPU
     // time in a high priority interrupt.  Not ideal.  :(
-    int16_t *dest = left->data;
+    int16_t * dest = left->data;
+    arm_dcache_delete ((void*) src, sizeof (pdm_buffer) >> 1);
     for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES*2 ; i += 2)
     {
       uint16_t s0 = filter_fir0 (src + i) ;
@@ -484,6 +482,7 @@ void AudioInputPDM2::isr(void)
       *dest++ = halfband.eval () ;
     }
   }
+#endif
   digitalWriteFast (14, LOW);
 }
 
