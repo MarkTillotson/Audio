@@ -24,13 +24,10 @@
  * THE SOFTWARE.
  */
 
-//#if !defined(__IMXRT1052__) && !defined(__IMXRT1062__)
-
 
 #include <Arduino.h>
 #include "input_pdm2.h"
 #include "utility/dspinst.h"
-
 
 
 
@@ -52,9 +49,6 @@ void AudioInputPDM2::begin(void)
 
   CCM_CCGR5 |= CCM_CCGR5_SAI1(CCM_CCGR_ON);
 
-  // if either transmitter or receiver is enabled, do nothing
-  //if (I2S1_TCSR & I2S_TCSR_TE) return;
-  //if (I2S1_RCSR & I2S_RCSR_RE) return;
 //PLL:
   int fs = AUDIO_SAMPLE_RATE_EXACT;
   // PLL between 27*24 = 648MHz und 54*24=1296MHz
@@ -77,37 +71,40 @@ void AudioInputPDM2::begin(void)
   // Select MCLK
   IOMUXC_GPR_GPR1 = (IOMUXC_GPR_GPR1 & ~(IOMUXC_GPR_GPR1_SAI1_MCLK1_SEL_MASK))
     | (IOMUXC_GPR_GPR1_SAI1_MCLK_DIR | IOMUXC_GPR_GPR1_SAI1_MCLK1_SEL(0));
-
+  /*
+  //// CORE_PIN33_CONFIG = 3;  //1:MCLK
+  CORE_PIN4_CONFIG = 3;  //1:RX_BCLK
+  //// CORE_PIN3_CONFIG = 3;  //1:RX_SYNC  // LRCLK
+  */
   //// CORE_PIN23_CONFIG = 3;  //1:MCLK
   CORE_PIN21_CONFIG = 3;  //1:RX_BCLK
   //// CORE_PIN20_CONFIG = 3;  //1:RX_SYNC  // LRCLK
-
+  
   int rsync = 0;
   int tsync = 1;
 
   I2S1_TMR = 0;
   //I2S1_TCSR = (1<<25); //Reset
   I2S1_TCR1 = I2S_TCR1_RFW(1);
-  I2S1_TCR2 = I2S_TCR2_SYNC(tsync) | I2S_TCR2_BCP // sync=0; tx is async;
-    | (I2S_TCR2_BCD | I2S_TCR2_DIV((1)) | I2S_TCR2_MSEL(1));
+  I2S1_TCR2 = I2S_TCR2_SYNC(tsync) | I2S_TCR2_BCP | (I2S_TCR2_BCD | I2S_TCR2_DIV((1)) | I2S_TCR2_MSEL(1)); // sync=0; tx is async;
   I2S1_TCR3 = I2S_TCR3_TCE;
-  I2S1_TCR4 = I2S_TCR4_FRSZ((2-1)) | I2S_TCR4_SYWD((32-1)) | I2S_TCR4_MF
-    | I2S_TCR4_FSD | I2S_TCR4_FSE | I2S_TCR4_FSP;
+  I2S1_TCR4 = I2S_TCR4_FRSZ((2-1)) | I2S_TCR4_SYWD((32-1)) | I2S_TCR4_MF | I2S_TCR4_FSD | I2S_TCR4_FSE | I2S_TCR4_FSP;
   I2S1_TCR5 = I2S_TCR5_WNW((32-1)) | I2S_TCR5_W0W((32-1)) | I2S_TCR5_FBT((32-1));
 
   I2S1_RMR = 0;
   //I2S1_RCSR = (1<<25); //Reset
   I2S1_RCR1 = I2S_RCR1_RFW(2);
-  I2S1_RCR2 = I2S_RCR2_SYNC(rsync) | I2S_RCR2_BCP  // sync=0; rx is async;
-    | (I2S_RCR2_BCD | I2S_RCR2_DIV((1)) | I2S_RCR2_MSEL(1));
+  I2S1_RCR2 = I2S_RCR2_SYNC(rsync) | I2S_RCR2_BCP | (I2S_RCR2_BCD | I2S_RCR2_DIV((1)) | I2S_RCR2_MSEL(1));  // sync=0; rx is async;
   I2S1_RCR3 = I2S_RCR3_RCE;
-  I2S1_RCR4 = I2S_RCR4_FRSZ((2-1)) | I2S_RCR4_SYWD((32-1)) | I2S_RCR4_MF
-    /* | I2S_RCR4_FSE */ | I2S_RCR4_FSP | I2S_RCR4_FSD;
+  I2S1_RCR4 = I2S_RCR4_FRSZ((2-1)) | I2S_RCR4_SYWD((32-1)) | I2S_RCR4_MF /* | I2S_RCR4_FSE */ | I2S_RCR4_FSP | I2S_RCR4_FSD;
   I2S1_RCR5 = I2S_RCR5_WNW((32-1)) | I2S_RCR5_W0W((32-1)) | I2S_RCR5_FBT((32-1));
-	
-  CORE_PIN8_CONFIG  = 3;  //1:RX_DATA0
-  IOMUXC_SAI1_RX_DATA0_SELECT_INPUT = 2;
 
+  /*
+  CORE_PIN5_CONFIG  = 3;  //1:RX_DATA0
+  */
+  CORE_PIN8_CONFIG  = 3;  //1:RX_DATA0
+
+  IOMUXC_SAI1_RX_DATA0_SELECT_INPUT = 2;
   
   dma.TCD->SADDR = &I2S1_RDR0;
   dma.TCD->SOFF = 0;
@@ -203,21 +200,17 @@ void AudioInputPDM2::begin(void)
   // configure transmitter
   I2S0_TMR = 0;
   I2S0_TCR1 = I2S_TCR1_TFW(1);  // watermark at half fifo size
-  I2S0_TCR2 = I2S_TCR2_SYNC(0) | I2S_TCR2_BCP | I2S_TCR2_MSEL(1)
-    | I2S_TCR2_BCD | I2S_TCR2_DIV(1);
+  I2S0_TCR2 = I2S_TCR2_SYNC(0) | I2S_TCR2_BCP | I2S_TCR2_MSEL(1) | I2S_TCR2_BCD | I2S_TCR2_DIV(1);
   I2S0_TCR3 = I2S_TCR3_TCE;
-  I2S0_TCR4 = I2S_TCR4_FRSZ(1) | I2S_TCR4_SYWD(31) | I2S_TCR4_MF
-    | I2S_TCR4_FSE | I2S_TCR4_FSP | I2S_TCR4_FSD;
+  I2S0_TCR4 = I2S_TCR4_FRSZ(1) | I2S_TCR4_SYWD(31) | I2S_TCR4_MF | I2S_TCR4_FSE | I2S_TCR4_FSP | I2S_TCR4_FSD;
   I2S0_TCR5 = I2S_TCR5_WNW(31) | I2S_TCR5_W0W(31) | I2S_TCR5_FBT(31);
 
   // configure receiver (sync'd to transmitter clocks)
   I2S0_RMR = 0;
   I2S0_RCR1 = I2S_RCR1_RFW(2);
-  I2S0_RCR2 = I2S_RCR2_SYNC(1) | I2S_TCR2_BCP | I2S_RCR2_MSEL(1)
-    | I2S_RCR2_BCD | I2S_RCR2_DIV(1);
+  I2S0_RCR2 = I2S_RCR2_SYNC(1) | I2S_TCR2_BCP | I2S_RCR2_MSEL(1) | I2S_RCR2_BCD | I2S_RCR2_DIV(1);
   I2S0_RCR3 = I2S_RCR3_RCE;
-  I2S0_RCR4 = I2S_RCR4_FRSZ(1) | I2S_RCR4_SYWD(31) | I2S_RCR4_MF
-    /* | I2S_RCR4_FSE */ | I2S_RCR4_FSP | I2S_RCR4_FSD;
+  I2S0_RCR4 = I2S_RCR4_FRSZ(1) | I2S_RCR4_SYWD(31) | I2S_RCR4_MF /* | I2S_RCR4_FSE */ | I2S_RCR4_FSP | I2S_RCR4_FSD;
   I2S0_RCR5 = I2S_RCR5_WNW(31) | I2S_RCR5_W0W(31) | I2S_RCR5_FBT(31);
 
   CORE_PIN9_CONFIG  = PORT_PCR_MUX(6); // pin  9, PTC3, I2S0_TX_BCLK
@@ -451,7 +444,7 @@ void AudioInputPDM2::isr(void)
   const uint32_t * src;
   audio_block_t * left;
 
-  digitalWriteFast (3, HIGH);
+  digitalWriteFast (14, HIGH);
 #if defined(KINETISK)
   daddr = (uint32_t)(dma.TCD->DADDR);
 #elif defined(__IMXRT1052__) || defined(__IMXRT1062__)
@@ -491,7 +484,7 @@ void AudioInputPDM2::isr(void)
       *dest++ = halfband.eval () ;
     }
   }
-  digitalWriteFast (3, LOW);
+  digitalWriteFast (14, LOW);
 }
 
 
@@ -1090,5 +1083,3 @@ const int32_t fir0_table [FIR0_BYTES << 8] =
       3,     3,     5,     5,     5,     5,     7,     7,     5,     5,     7,     7,     7,     7,     9,     9, 
 //  int16
 };
-
-//#endif
