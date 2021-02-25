@@ -24,8 +24,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef data_windows_h_
-#define data_windows_h_
+#ifndef fft_windows_h_
+#define fft_windows_h_
 
 #include <stdint.h>
 #include "Arduino.h"
