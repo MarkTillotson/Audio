@@ -537,6 +537,7 @@ span.mainfunction {color: #993300; font-weight: bolder}
 		{"type":"AudioAnalyzeRMS","data":{"defaults":{"name":{"value":"new"}},"shortName":"rms","inputs":1,"outputs":0,"category":"analyze-function","color":"#E6E0F8","icon":"arrow-in.png"}},
 		{"type":"AudioAnalyzeFFT256","data":{"defaults":{"name":{"value":"new"}},"shortName":"fft256","inputs":1,"outputs":0,"category":"analyze-function","color":"#E6E0F8","icon":"arrow-in.png"}},
 		{"type":"AudioAnalyzeFFT1024","data":{"defaults":{"name":{"value":"new"}},"shortName":"fft1024","inputs":1,"outputs":0,"category":"analyze-function","color":"#E6E0F8","icon":"arrow-in.png"}},
+		{"type":"AudioAnalyzeFFT","data":{"defaults":{"name":{"value":"new"}},"shortName":"genericfft","inputs":1,"outputs":0,"category":"analyze-function","color":"#E6E0F8","icon":"arrow-in.png"}},
 		{"type":"AudioAnalyzeToneDetect","data":{"defaults":{"name":{"value":"new"}},"shortName":"tone","inputs":1,"outputs":0,"category":"analyze-function","color":"#E6E0F8","icon":"arrow-in.png"}},
 		{"type":"AudioAnalyzeNoteFrequency","data":{"defaults":{"name":{"value":"new"}},"shortName":"notefreq","inputs":1,"outputs":0,"category":"analyze-function","color":"#E6E0F8","icon":"arrow-in.png"}},
 		{"type":"AudioAnalyzePrint","data":{"defaults":{"name":{"value":"new"}},"shortName":"print","inputs":1,"outputs":0,"category":"analyze-function","color":"#E6E0F8","icon":"arrow-in.png"}},
@@ -4862,6 +4863,83 @@ double s_freq = .0625;</p>
 	</p>
 </script>
 <script type="text/x-red" data-template-name="AudioAnalyzeFFT1024">
+	<div class="form-row">
+		<label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+		<input type="text" id="node-input-name" placeholder="Name">
+	</div>
+</script>
+
+<script type="text/x-red" data-help-name="AudioAnalyzeFFT">
+	<h3>Summary</h3>
+	<div class=tooltipinfo>
+	<p>Compute an N-point Fast Fourier Transform (FFT) frequency analysis,
+	  with real value (magnitude) output.  N can be any power of two between 2^5 and 2^13
+	  (between 32 and 8192).  Internally 32 bit precision is used giving much less noise than the
+          AudioAnalyzeFFT256 and AudioAnalyzeFFT1024 classes.</p>
+	</div>
+	<h3>Audio Connections</h3>
+	<table class=doc align=center cellpadding=3>
+		<tr class=top><th>Port</th><th>Purpose</th></tr>
+		<tr class=odd><td align=center>In 0</td><td>Signal to convert to frequency bins</td></tr>
+	</table>
+	<h3>Functions</h3>
+	<p class=func><span class=keyword>available</span>();</p>
+	<p class=desc>Returns true each time the FFT analysis produces new output data.
+	</p>
+	<p class=func><span class=keyword>read</span>(binNumber);</p>
+	<p class=desc>Read a single frequency bin, from 0 to N/2-1 where N is the order of FFT.
+	  The result is scaled so 1.0 represents a full scale sine wave.
+	</p>
+	<p class=func><span class=keyword>read</span>(firstBin, lastBin);</p>
+	<p class=desc>Read several frequency bins, returning their sum.  The higher
+		audio octaves are represented by many bins, which are typically read
+		as a group for audio visualization.
+	</p>
+	<p class=func><span class=keyword>read_noise</span>(binNumber);</p>
+	<p class=desc>Read a single frequency bin, from 0 to N/2-1 where N is the order of FFT.
+	  The result is scaled for noise floor measurement.
+	</p>
+	<p class=func><span class=keyword>fftWindow</span>(window_desc);</p>
+	<p class=desc>Set the window function to be used.  Available window descriptors are
+	  rect_window, hann_window, hamming_window, blackman_window, flattop_window,
+	  blackman_harris_window, nuttall_window, blackman_nuttall_window, hft144d_window,
+	  bartlett_window, welch_window, cosine_window, tukey_window.</p>
+
+	<p class=desc>Windowing may be effectively disabled by using rect_window, but a suitable window
+		should be used for all non-periodic (music) signals, and all periodic
+		signals that are not exact integer division of the sample rate.
+	</p>
+	<p class=func><span class=keyword>overlapBlocks</span>(blocks);</p>
+	<p class=desc>Set the number of audio blocks overlapping between successive FFTs.
+	</p>
+	
+	<h3>Examples</h3>
+	<!--
+	<p class=exam>File &gt; Examples &gt; Audio &gt; Analysis &gt; FFT
+	</p>
+	<p class=exam>File &gt; Examples &gt; Audio &gt; Analysis &gt; SpectrumAnalyzerBasic
+	</p>
+	-->
+	<h3>Notes</h3>
+	<p>Window Types:
+		<ul>
+		<li><span class=literal>rect_window</span></li>
+		<li><span class=literal>hann_window</span> (default)</li>
+		<li><span class=literal>hamming_window</span></li>
+		<li><span class=literal>blackman_window</span></li>
+		<li><span class=literal>flattop_window</span></li>
+		<li><span class=literal>blackman_harris_window</span></li>
+		<li><span class=literal>nuttall_window</span></li>
+		<li><span class=literal>blackman_nuttall_window</span></li>
+		<li><span class=literal>hft144d_window</span></li>
+		<li><span class=literal>bartlett_window</span></li>
+		<li><span class=literal>welch_window</span></li>
+		<li><span class=literal>cosine_window</span></li>
+		<li><span class=literal>tukey_window</span></li>
+		</ul>
+	</p>
+</script>
+<script type="text/x-red" data-template-name="AudioAnalyzeFFT">
 	<div class="form-row">
 		<label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
 		<input type="text" id="node-input-name" placeholder="Name">
