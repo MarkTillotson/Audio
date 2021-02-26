@@ -82,7 +82,7 @@ float32_t FFTWindow::noiseBandwidth ()
   return noise_bandwidth ;
 }
 
-
+// expand as single floats into buffer - note buffer is half N in size as symmetry is exploited
 void FFTWindow::expand_float (float32_t * buffer, int N)
 {
   float32_t val = calc (0.0) ;
@@ -96,7 +96,6 @@ void FFTWindow::expand_float (float32_t * buffer, int N)
     sum += 2*val ;
     sumsq += 2*val*val ;
     buffer[i] = val ;
-    //buffer[N - i] = val ;
   }
 
   val = calc (0.5) ;
@@ -126,7 +125,6 @@ void FFTWindow::expand_q31 (int32_t * buffer, int N)
     sumsq += 2*val*val ;
     int32_t ival = (int32_t) int (round (val * 0x7fffffff)) ;
     buffer[i] = ival ;
-    //buffer[N - i] = ival ;
   }
 
   buffer[N/2] = 0x7fffffff ;
@@ -153,7 +151,6 @@ void FFTWindow::expand_q15 (int16_t * buffer, int N)
     sumsq += 2*val*val ;
     int16_t ival = (int16_t) int (round (val * 0x7fff)) ;
     buffer[i] = ival ;
-    //buffer[N - i] = ival ;
   }
 
   buffer[N/2] = 0x7fff ;
@@ -165,7 +162,7 @@ void FFTWindow::expand_q15 (int16_t * buffer, int N)
 float64_t window_coeffs[] =
 {
   // 0
-  1.0, -1.0,    // Hann
+  1.0, -1.0,    // Hann = 1 - cos(a)
   // 2
   0.54, -0.46,  // Hamming
   // 4
