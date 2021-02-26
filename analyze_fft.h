@@ -40,9 +40,15 @@
 class AudioAnalyzeFFT : public AudioStream
 {
 public:
-  AudioAnalyzeFFT (unsigned int N_points) : AudioStream (1, inputQueueArray)
+  AudioAnalyzeFFT (void) : AudioStream (1, inputQueueArray)
   {
-    N = N_points ;
+    valid = false ;
+  }
+  
+  void Npoints (unsigned int N_points)
+  {
+    // TODO: if already valid, free the various heap allocated stuff
+    // TODO: use new not malloc
     state = 0 ;
     outputflag = false ;
     
@@ -68,12 +74,16 @@ public:
     for (int i = 0 ; i < total_blocks ; i++)
       blocklist[i] = NULL ;
     fftWindow (&hann_window) ;  // default window
-    valid = true ;
     Serial.printf ("Valid fft, N=%i, overlap=%i, total=%i, state=%i\n", N, overlap_blocks, total_blocks, state) ;
+    __disable_irq() ;
+    valid = true ;
+    __enable_irq() ;
   }
   
   bool available()
   {
+    if (!valid)
+      return false ;
     bool avail = outputflag ;
     outputflag = false ;
     return avail ;
@@ -81,14 +91,14 @@ public:
 
   float read (unsigned int binNumber)
   {
-    if (binNumber > N/2)
+    if (!valid || binNumber > N/2)
       return 0.0;
     return (float) output[binNumber] * processing_gain ; // / 0x40000000 / processing_gain ;
   }
 
   float read_noise (unsigned int binNumber)
   {
-    if (binNumber > N/2)
+    if (!valid || binNumber > N/2)
       return 0.0;
     return (float) output[binNumber] * noise_gain ; // / 0x40000000 / noise_gain ;
   }
@@ -101,7 +111,7 @@ public:
       binLast = binFirst;
       binFirst = tmp;
     }
-    if (binFirst > N/2)
+    if (!valid || binFirst > N/2)
       return 0.0 ;
     if (binLast > N/2)
       binLast = N/2 ;

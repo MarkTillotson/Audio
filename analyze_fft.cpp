@@ -63,6 +63,9 @@ void AudioAnalyzeFFT::apply_window_to_fft_buffer (void)
 
 void AudioAnalyzeFFT::update(void)
 {
+  if (N == 0)  // Npoints() hasn't been called yet...
+    return ;
+  
   audio_block_t * block = receiveReadOnly();
   if (block == NULL)
     return;
