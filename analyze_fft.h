@@ -45,40 +45,7 @@ public:
     valid = false ;
   }
   
-  void Npoints (unsigned int N_points)
-  {
-    // TODO: if already valid, free the various heap allocated stuff
-    // TODO: use new not malloc
-    state = 0 ;
-    outputflag = false ;
-    
-    total_blocks = N / AUDIO_BLOCK_SAMPLES ;
-    overlap_blocks = total_blocks >> 1 ;
-    if (arm_rfft_init_q31 (&fft_inst, N, 0, 1) != ARM_MATH_SUCCESS)
-    {
-      Serial.println ("Bad size for AudioAnalyzeFFT") ;
-      valid = false ;
-      return ;
-    }
-    output = (uint32_t *) malloc ((N/2+1) * sizeof (int32_t)) ;
-    blocklist = (audio_block_t **) malloc (total_blocks * sizeof (audio_block_t*)) ;
-    r_buffer = (int32_t *) malloc (N * sizeof (int32_t)) ;
-    c_buffer = (int32_t *) malloc (2 * N * sizeof (int32_t)) ;
-    window = (int16_t *) malloc ((N/2+1) * sizeof (int16_t)) ;
-    if (output == NULL || blocklist == NULL || r_buffer == NULL || c_buffer == NULL || window == NULL)
-    {
-      Serial.println ("malloc failed for AudioAnalyzeFFT") ;
-      valid = false ;
-      return ;
-    }
-    for (int i = 0 ; i < total_blocks ; i++)
-      blocklist[i] = NULL ;
-    fftWindow (&hann_window) ;  // default window
-    Serial.printf ("Valid fft, N=%i, overlap=%i, total=%i, state=%i\n", N, overlap_blocks, total_blocks, state) ;
-    __disable_irq() ;
-    valid = true ;
-    __enable_irq() ;
-  }
+  int Npoints (unsigned int N_points) ;
   
   bool available()
   {

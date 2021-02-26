@@ -30,6 +30,55 @@
 #include "utility/dspinst.h"
 
 
+
+int AudioAnalyzeFFT::Npoints (unsigned int N_points)
+{
+  if (valid)
+  {
+    if (N == N_points)
+      return N ;  // already the right size
+    delete (output) ;
+    delete (blocklist) ;
+    delete (r_buffer) ;
+    delete (c_buffer) ;
+    delete (window) ;
+  }
+  N = N_points ;
+  state = 0 ;
+  outputflag = false ;
+    
+  total_blocks = N / AUDIO_BLOCK_SAMPLES ;
+  overlap_blocks = total_blocks >> 1 ;
+  if (arm_rfft_init_q31 (&fft_inst, N, 0, 1) != ARM_MATH_SUCCESS)
+  {
+    //Serial.println ("Bad size for AudioAnalyzeFFT") ;
+    valid = false ;
+    return 0 ;
+  }
+
+  output = new uint32_t [(N/2+1)] ;
+  blocklist = new audio_block_t * [total_blocks] ;
+  r_buffer = new int32_t [N] ;
+  c_buffer = new int32_t [2 * N] ;
+  window = new int16_t [N/2+1] ;
+  if (output == NULL || blocklist == NULL || r_buffer == NULL || c_buffer == NULL || window == NULL)
+  {
+    //Serial.println ("malloc failed for AudioAnalyzeFFT") ;
+    valid = false ;
+    return 0 ;
+  }
+  
+  for (int i = 0 ; i < total_blocks ; i++)
+    blocklist[i] = NULL ;
+  fftWindow (&hann_window) ;  // default window
+  //Serial.printf ("Valid fft, N=%i, overlap=%i, total=%i, state=%i\n", N, overlap_blocks, total_blocks, state) ;
+  __disable_irq() ;
+  valid = true ;
+  __enable_irq() ;
+  return N ;
+}
+
+
 void AudioAnalyzeFFT::copy_to_fft_buffer (int blk, const int16_t * src)
 {
   int32_t * dest = &r_buffer[blk << 7] ;

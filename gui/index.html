@@ -4873,9 +4873,10 @@ double s_freq = .0625;</p>
 	<h3>Summary</h3>
 	<div class=tooltipinfo>
 	<p>Compute an N-point Fast Fourier Transform (FFT) frequency analysis,
-	  with real value (magnitude) output.  N can be any power of two between 2^5 and 2^13
-	  (between 32 and 8192).  Internally 32 bit precision is used giving much less noise than the
-          AudioAnalyzeFFT256 and AudioAnalyzeFFT1024 classes.</p>
+	  with real value (magnitude) output.  N can be any power of two between 
+	  2^5 and 2^13 (between 32 and 8192).  Internally 32 bit precision is used
+	  giving much less noise than the AudioAnalyzeFFT256 and AudioAnalyzeFFT1024
+	  classes, but of course this means its somewhat more processor intensive.</p>
 	</div>
 	<h3>Audio Connections</h3>
 	<table class=doc align=center cellpadding=3>
@@ -4883,6 +4884,10 @@ double s_freq = .0625;</p>
 		<tr class=odd><td align=center>In 0</td><td>Signal to convert to frequency bins</td></tr>
 	</table>
 	<h3>Functions</h3>
+	<p class=func><span class=keyword>Npoints</span>(N_points);</p>
+	<p class=desc>Sets the number of points (a power of two between 32 and 8192.
+	  Returns zero if there was a problem, or the number of points if it succeeds.
+	</p>
 	<p class=func><span class=keyword>available</span>();</p>
 	<p class=desc>Returns true each time the FFT analysis produces new output data.
 	</p>
@@ -4897,7 +4902,7 @@ double s_freq = .0625;</p>
 	</p>
 	<p class=func><span class=keyword>read_noise</span>(binNumber);</p>
 	<p class=desc>Read a single frequency bin, from 0 to N/2-1 where N is the order of FFT.
-	  The result is scaled for noise floor measurement.
+	  The result is scaled for noise floor measurement, not sinusoids.
 	</p>
 	<p class=func><span class=keyword>fftWindow</span>(window_desc);</p>
 	<p class=desc>Set the window function to be used.  Available window descriptors are
@@ -4905,12 +4910,14 @@ double s_freq = .0625;</p>
 	  blackman_harris_window, nuttall_window, blackman_nuttall_window, hft144d_window,
 	  bartlett_window, welch_window, cosine_window, tukey_window.</p>
 
-	<p class=desc>Windowing may be effectively disabled by using rect_window, but a suitable window
-		should be used for all non-periodic (music) signals, and all periodic
-		signals that are not exact integer division of the sample rate.
+	<p class=desc>Windowing may be effectively disabled by using rect_window, but a 
+	  suitable window should be used for all non-periodic (music) signals, and all periodic
+	  signals that are not exact integer division of the sample rate.
 	</p>
 	<p class=func><span class=keyword>overlapBlocks</span>(blocks);</p>
-	<p class=desc>Set the number of audio blocks overlapping between successive FFTs.
+	<p class=desc>Set the number of audio blocks overlapping between successive FFTs.  There
+	  are normally 128 samples per block, so setting the overlap to 8 blocks for a 2048 point FFT will
+	  mean 50% overlap with previous and successive FFTs.
 	</p>
 	
 	<h3>Examples</h3>
