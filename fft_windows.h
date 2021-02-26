@@ -40,7 +40,9 @@ enum WindowType
   FUNCTION_WINDOW = 2
 };
 
-
+// Generic window descriptor, for AudioAnalyzeFFT generic FFT class, the same descriptor
+// can be used for multiple FFT point sizes as the defining cosine polynomial is
+// represented, not the expanded datapoints.
 class FFTWindow
 {
  public:
@@ -48,13 +50,13 @@ class FFTWindow
   FFTWindow (const char * name, float32_t (*fn) (float32_t)) ;
   FFTWindow (const char * name, int cosine_order, float64_t * cosine_coeffs) ;
 
-  void expand_float (float32_t * buffer, int N) ;
-  void expand_q31 (int32_t * buffer, int N) ;
-  void expand_q15 (int16_t * buffer, int N) ;
+  void expand_float (float32_t * buffer, int N) ; // expand to single float for N points
+  void expand_q31 (int32_t * buffer, int N) ; // expand to fixed point Q31 for N points
+  void expand_q15 (int16_t * buffer, int N) ; // expand to fixed point Q15 for N points
   float32_t processingGain ();
   float32_t noiseBandwidth () ;
-  static void register_fft_window (FFTWindow * window) ;
-  static FFTWindow * fft_window (const char * name) ;
+  static void register_fft_window (FFTWindow * window) ; // add to global list
+  static FFTWindow * fft_window (const char * name) ; // lookup by name
 
  private:
   const char * name ;
