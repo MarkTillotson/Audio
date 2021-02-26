@@ -80,7 +80,7 @@ void loop()
   
   if (gen_fft.available ())
   {
-    Serial.println ("GEN FFT:") ;
+    Serial.println ("Generic AudioAnalyzeFFT with 1024 points:") ;
 #ifndef PLOT
     for (int i = 9 ; i < 16 ; i ++)  // around tone1
     {
@@ -117,7 +117,7 @@ void loop()
   
   if (exist_fft.available ())
   {
-    Serial.println ("EXIST FFT:") ;
+    Serial.println ("AudioAnalyzeFFT1024:") ;
 #ifndef PLOT
     for (int i = 9 ; i < 16 ; i ++)
     {
