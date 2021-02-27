@@ -29,6 +29,78 @@
 #include "sqrt_integer.h"
 #include "utility/dspinst.h"
 
+bool AudioAnalyzeFFT::available(void)
+  {
+    if (!valid)
+      return false ;
+    bool avail = outputflag ;
+    outputflag = false ;
+    return avail ;
+  }
+
+float AudioAnalyzeFFT::read (unsigned int binNumber)
+{
+  if (!valid || binNumber > N/2)
+    return 0.0;
+  return (float) output[binNumber] * processing_gain ;
+}
+
+float AudioAnalyzeFFT::read_noise (unsigned int binNumber)
+{
+  if (!valid || binNumber > N/2)
+    return 0.0;
+  return (float) output[binNumber] * noise_gain ;
+}
+  
+float AudioAnalyzeFFT::read (unsigned int binFirst, unsigned int binLast)
+{
+  if (binFirst > binLast)
+  {
+    unsigned int tmp = binLast;
+    binLast = binFirst;
+    binFirst = tmp;
+  }
+  if (!valid || binFirst > N/2)
+    return 0.0 ;
+  if (binLast > N/2)
+    binLast = N/2 ;
+  uint64_t sum = 0L ;
+  do
+  {
+    sum += output [binFirst++] ;
+  } while (binFirst <= binLast) ;
+    
+  return (float) sum * processing_gain ;
+}
+  
+void AudioAnalyzeFFT::fftWindow (FFTWindow * window_desc)
+{
+  __disable_irq() ;
+  window_desc->expand_q15 (window, N) ;
+  processing_gain = window_desc->processingGain() ;
+  noise_gain = processing_gain * sqrt (window_desc->noiseBandwidth()) ;
+  // scale for read() methods
+  processing_gain = 1.0 / 0x40000000 / processing_gain ;
+  noise_gain = 1.0 / 0x40000000 / noise_gain ;
+  __enable_irq() ;
+}
+
+void AudioAnalyzeFFT::overlapBlocks (unsigned int blocks)
+{
+  blocks %= (N / AUDIO_BLOCK_SAMPLES) ;
+  __disable_irq() ;
+  if (overlap_blocks != blocks)
+  {
+    overlap_blocks = blocks ;
+    for (int i = 0 ; i < total_blocks ; i++)
+      if (blocklist[i] != NULL)
+      {
+        release (blocklist[i]) ;
+        blocklist[i] = NULL ;
+      }
+  }
+  __enable_irq() ;
+}
 
 
 int AudioAnalyzeFFT::Npoints (unsigned int N_points)
@@ -151,20 +223,18 @@ void AudioAnalyzeFFT::update(void)
     {
       int ind = i + total_blocks - overlap_blocks ;
       if (blocklist[ind] == NULL)
-	zero_fft_buffer (i) ;
+        zero_fft_buffer (i) ;
       else
-	copy_to_fft_buffer (i, blocklist[ind]->data);
+        copy_to_fft_buffer (i, blocklist[ind]->data);
       blocklist[i] = blocklist[ind];
     }
     for (int i = 0 ; i < total_blocks - overlap_blocks ; i++)
       if (blocklist [i] != NULL)
-	release (blocklist [i]) ;
-		
+        release (blocklist [i]) ;
+                
     state = overlap_blocks;
   }
 #else
   release(block);
 #endif
 }
-
-

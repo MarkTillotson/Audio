@@ -47,78 +47,12 @@ public:
   
   int Npoints (unsigned int N_points) ;
   
-  bool available()
-  {
-    if (!valid)
-      return false ;
-    bool avail = outputflag ;
-    outputflag = false ;
-    return avail ;
-  }
-
-  float read (unsigned int binNumber)
-  {
-    if (!valid || binNumber > N/2)
-      return 0.0;
-    return (float) output[binNumber] * processing_gain ; // / 0x40000000 / processing_gain ;
-  }
-
-  float read_noise (unsigned int binNumber)
-  {
-    if (!valid || binNumber > N/2)
-      return 0.0;
-    return (float) output[binNumber] * noise_gain ; // / 0x40000000 / noise_gain ;
-  }
-  
-  float read (unsigned int binFirst, unsigned int binLast)
-  {
-    if (binFirst > binLast)
-    {
-      unsigned int tmp = binLast;
-      binLast = binFirst;
-      binFirst = tmp;
-    }
-    if (!valid || binFirst > N/2)
-      return 0.0 ;
-    if (binLast > N/2)
-      binLast = N/2 ;
-    uint64_t sum = 0L ;
-    do
-    {
-      sum += output [binFirst++] ;
-    } while (binFirst <= binLast) ;
-    
-    return (float) sum * processing_gain ; // 0x40000000 / processing_gain ;
-  }
-  
-  void fftWindow (FFTWindow * window_desc)
-  {
-    __disable_irq() ;
-    window_desc->expand_q15 (window, N) ;
-    processing_gain = window_desc->processingGain() ;
-    noise_gain = processing_gain * sqrt (window_desc->noiseBandwidth()) ;
-    // scale for read() methods
-    processing_gain = 1.0 / 0x40000000 / processing_gain ;
-    noise_gain = 1.0 / 0x40000000 / noise_gain ;
-    __enable_irq() ;
-  }
-
-  void overlapBlocks (unsigned int blocks)
-  {
-    blocks %= (N / AUDIO_BLOCK_SAMPLES) ;
-    __disable_irq() ;
-    if (overlap_blocks != blocks)
-    {
-      overlap_blocks = blocks ;
-      for (int i = 0 ; i < total_blocks ; i++)
-	if (blocklist[i] != NULL)
-	{
-	  release (blocklist[i]) ;
-	  blocklist[i] = NULL ;
-	}
-    }
-    __enable_irq() ;
-  }
+  bool available(void) ;
+  float read (unsigned int binNumber) ;
+  float read_noise (unsigned int binNumber) ;
+  float read (unsigned int binFirst, unsigned int binLast) ;
+  void fftWindow (FFTWindow * window_desc) ;
+  void overlapBlocks (unsigned int blocks) ;
 
   virtual void update(void);
   uint32_t * output ;
