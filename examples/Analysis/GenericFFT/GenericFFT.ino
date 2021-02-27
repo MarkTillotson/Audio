@@ -160,3 +160,122 @@ void loop()
     Serial.println () ;
   }
 }
+
+/* example output from T4.0
+
+AudioAnalyzeFFT1024:
+388Hz -23.709
+431Hz -16.219
+474Hz -14.389
+517Hz -14.325    // -1dB -13.3dB due to processing gain of unnormalized flattop window
+560Hz -15.345
+603Hz -20.942
+646Hz -35.011
+
+1120Hz -43.150
+1163Hz -35.253
+1206Hz -33.457
+1249Hz -33.308   // -20dB -13.3dB due to processing gain of unnormalized flattop window
+1292Hz -34.378
+1335Hz -39.628
+1378Hz -54.185
+
+2067Hz -78.268
+2110Hz -57.440
+2153Hz -54.746
+2196Hz -52.924   // -39.6dB -13.3dB due to processing gain of unnormalized flattop window
+2239Hz -54.185
+2283Hz -55.345
+2326Hz -68.725
+
+3402Hz -84.288
+3445Hz -78.268
+3488Hz -74.746
+3531Hz -72.247   // -59dB -13.3dB due to processing gain of unnormalized flattop window
+3575Hz -74.746
+3618Hz -72.247
+3661Hz -78.268
+
+3876Hz -84.288
+3919Hz -84.288
+3962Hz inf
+4005Hz -84.288   // lost in noise floor
+4048Hz -84.288
+4091Hz -84.288
+4134Hz -84.288
+noise floor, as power spectrum:
+6460Hz -84.288
+6503Hz -84.288
+6546Hz -84.288   // numerical error leads to way higher noise floor than reality, should be -141dB about
+6589Hz -84.288
+6632Hz inf
+6675Hz -84.288
+6718Hz -84.288
+6761Hz inf
+6804Hz inf
+6848Hz -84.288
+6891Hz -84.288
+6934Hz inf
+6977Hz -84.288
+7020Hz -78.268
+7063Hz -84.288
+
+
+Generic AudioAnalyzeFFT with 1024 points:
+388Hz -10.383
+431Hz -2.902
+474Hz -1.048
+517Hz -1.004   // -1dB
+560Hz -2.007
+603Hz -7.646
+646Hz -21.647
+
+1120Hz -29.619
+1163Hz -21.985
+1206Hz -20.056
+1249Hz -20.003   // -20dB
+1292Hz -20.954
+1335Hz -26.462
+1378Hz -40.248
+
+2067Hz -56.707
+2110Hz -44.880
+2153Hz -40.539
+2196Hz -40.003   // -40dB
+2239Hz -40.163
+2283Hz -42.910
+2326Hz -52.042
+
+3402Hz -84.396
+3445Hz -68.562
+3488Hz -61.689
+3531Hz -60.171   // -60.2 dB (amplitude of signal only 32LSBs, so slight amplitude error expected)
+3575Hz -60.157
+3618Hz -61.401
+3661Hz -67.560
+
+3876Hz -97.379
+3919Hz -86.388
+3962Hz -82.056
+4005Hz -81.569   // -81.5 dB (amplitude of signal only 3LSBs, so significant amplitude error expected)
+4048Hz -81.624
+4091Hz -85.164
+4134Hz -95.263
+noise floor:
+6460Hz -134.117
+6503Hz -127.824  // ideally noise floor would be about -141dB for 16 bits and 22.050kHz bandwidth.
+6546Hz -123.631  // still this is about 45dB better than AudioAnalyzeFFT1024 for same data...
+6589Hz -127.652
+6632Hz -129.584
+6675Hz -137.534
+6718Hz -132.302
+6761Hz -143.825
+6804Hz -139.573
+6848Hz -132.996
+6891Hz -136.070
+6934Hz -131.536
+6977Hz -131.404
+7020Hz -131.876
+7063Hz -132.146
+
+*/
