@@ -178,6 +178,8 @@ float64_t window_coeffs[] =
   // 24
   1.00000000, -1.96760033, 1.57983607, -0.81123644, 0.22583558, -0.02773848, 0.00090360, // HFT144D flattop
   // 31
+  1.0000000, -1.9383379, 1.3045202, -0.4028270, 0.0350665, // HFT95 flattop
+  // 36
 } ;
 
 FFTWindow rect_window ("Rect") ;
@@ -189,6 +191,7 @@ FFTWindow blackman_harris_window ("BlackmanHarris", 4, window_coeffs+12) ;
 FFTWindow nuttall_window ("Nuttall", 4, window_coeffs+16) ;
 FFTWindow blackman_nuttall_window ("BlackmanNuttall", 4, window_coeffs+20) ;
 FFTWindow hft144d_window ("HFT144D", 7, window_coeffs+24) ;
+FFTWindow hft95_window ("HFT95", 5, window_coeffs+31) ;
 
 float32_t bartlett_fn (float32_t x) { return 1.0 - abs (2*x-1) ; }
 
@@ -238,6 +241,7 @@ void register_all_windows ()
   FFTWindow::register_fft_window (&cosine_window) ;
   FFTWindow::register_fft_window (&tukey_window) ;
   FFTWindow::register_fft_window (&hft144d_window) ;
+  FFTWindow::register_fft_window (&hft95_window) ;
 }
 
 FFTWindow * FFTWindow::fft_window (const char * name)

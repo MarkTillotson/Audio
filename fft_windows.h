@@ -80,6 +80,7 @@ extern FFTWindow flattop_window ;
 extern FFTWindow blackman_harris_window ;
 extern FFTWindow nuttall_window ;
 extern FFTWindow blackman_nuttall_window ;
+extern FFTWindow hft95_window ;
 extern FFTWindow hft144d_window ;
 extern FFTWindow bartlett_window ;
 extern FFTWindow welch_window ;

@@ -4907,8 +4907,8 @@ double s_freq = .0625;</p>
 	<p class=func><span class=keyword>fftWindow</span>(window_desc);</p>
 	<p class=desc>Set the window function to be used.  Available window descriptors are
 	  rect_window, hann_window, hamming_window, blackman_window, flattop_window,
-	  blackman_harris_window, nuttall_window, blackman_nuttall_window, hft144d_window,
-	  bartlett_window, welch_window, cosine_window, tukey_window.</p>
+	  blackman_harris_window, nuttall_window, blackman_nuttall_window, hft95_window,
+	  hft144d_window, bartlett_window, welch_window, cosine_window, tukey_window.</p>
 
 	<p class=desc>Windowing may be effectively disabled by using rect_window, but a 
 	  suitable window should be used for all non-periodic (music) signals, and all periodic
@@ -4916,8 +4916,8 @@ double s_freq = .0625;</p>
 	</p>
 	<p class=func><span class=keyword>overlapBlocks</span>(blocks);</p>
 	<p class=desc>Set the number of audio blocks overlapping between successive FFTs.  There
-	  are normally 128 samples per block, so setting the overlap to 8 blocks for a 2048 point FFT will
-	  mean 50% overlap with previous and successive FFTs.
+	  are normally 128 samples per block, so setting the overlap to 8 blocks for a 2048
+	  point FFT will mean 50% overlap with previous and successive FFTs.
 	</p>
 	
 	<h3>Examples</h3>
@@ -4934,6 +4934,7 @@ double s_freq = .0625;</p>
 		<li><span class=literal>blackman_harris_window</span></li>
 		<li><span class=literal>nuttall_window</span></li>
 		<li><span class=literal>blackman_nuttall_window</span></li>
+		<li><span class=literal>hft95_window</span></li>
 		<li><span class=literal>hft144d_window</span></li>
 		<li><span class=literal>bartlett_window</span></li>
 		<li><span class=literal>welch_window</span></li>
