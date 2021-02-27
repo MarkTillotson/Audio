@@ -60,7 +60,7 @@ float32_t FFTWindow::calc (float32_t x)
     {
       float64_t val = cosine_coeffs[0] ;
       for (int i = 1 ; i < cosine_order ; i++)
-	val += cosine_coeffs[i] * cos (2*M_PI * i*x) ;
+        val += cosine_coeffs[i] * cos (2*M_PI * i*x) ;
       return (float32_t) val ;
     }
 
