@@ -49,7 +49,9 @@ public:
   
   bool available(void) ;
   float read (unsigned int binNumber) ;
+  float dB (unsigned int binNumber) ;
   float readNoise (unsigned int binNumber) ;
+  float dBNoise (unsigned int binNumber) ;
   float read (unsigned int binFirst, unsigned int binLast) ;
   void fftWindow (FFTWindow * window_desc) ;
   void overlapBlocks (unsigned int blocks) ;

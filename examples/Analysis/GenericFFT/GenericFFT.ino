@@ -84,27 +84,32 @@ void loop()
 #ifndef PLOT
     for (int i = 9 ; i < 16 ; i ++)  // around tone1
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (gen_fft.read (i)), 7) ;
+      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 7) ;
     }
     Serial.println () ;
     for (int i = 26 ; i < 33 ; i ++)  // around tone2
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (gen_fft.read (i)), 7) ;
+      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 7) ;
     }
     Serial.println () ;
     for (int i = 48 ; i < 55 ; i ++)  // around tone3
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (gen_fft.read (i)), 7) ;
+      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 7) ;
     }
     Serial.println () ;
     for (int i = 79 ; i < 86 ; i ++)  // around tone4
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (gen_fft.read (i)), 7) ;
+      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 7) ;
     }
     Serial.println () ;
     for (int i = 90 ; i < 97 ; i ++)  // around tone5
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (gen_fft.read (i)), 7) ;
+      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 7) ;
+    }
+    Serial.println ("noise:") ;
+    for (int i = 90 ; i < 97 ; i ++)  // around tone5
+    {
+      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dBNoise (i), 7) ;
     }
 
 #else

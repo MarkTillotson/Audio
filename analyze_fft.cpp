@@ -43,11 +43,21 @@ float AudioAnalyzeFFT::read (unsigned int binNumber)
   return (float) output[binNumber] * processing_gain ;
 }
 
+float AudioAnalyzeFFT::dB (unsigned int binNumber)
+{
+  return 20 * log10 (read (binNumber)) ;
+}
+
 float AudioAnalyzeFFT::readNoise (unsigned int binNumber)
 {
   if (!valid || binNumber > N/2)
     return 0.0;
   return (float) output[binNumber] * noise_gain ;
+}
+
+float AudioAnalyzeFFT::dBNoise (unsigned int binNumber)
+{
+  return 20 * log10 (readNoise (binNumber)) ;
 }
   
 float AudioAnalyzeFFT::read (unsigned int binFirst, unsigned int binLast)
