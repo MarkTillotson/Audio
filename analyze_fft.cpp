@@ -79,6 +79,7 @@ void AudioAnalyzeFFT::fftWindow (FFTWindow * window_desc)
   window_desc->expand_q15 (window, N) ;
   processing_gain = window_desc->processingGain() ;
   noise_gain = processing_gain * sqrt (window_desc->noiseBandwidth()) ;
+  noise_gain *= sqrt (AUDIO_SAMPLE_RATE_EXACT / N) ;
   // scale for read() methods
   processing_gain = 1.0 / 0x40000000 / processing_gain ;
   noise_gain = 1.0 / 0x40000000 / noise_gain ;
