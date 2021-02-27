@@ -2,6 +2,19 @@
 
 //#DEFINE PLOT   // enable this for ASCII graph of dB
 
+#ifdef __IMXRT1062__
+#define POINTS 1024
+#else
+#define POINTS 512  // T3.2 can't handle 1024 points real fft....
+#endif
+
+
+#define freq1 501
+#define freq2 1234
+#define freq3 2203
+#define freq4 3555
+#define freq5 4009
+
 AudioSynthWaveformSine tone1 ;
 AudioSynthWaveformSine tone2 ;
 AudioSynthWaveformSine tone3 ;
@@ -31,19 +44,23 @@ AudioControlSGTL5000   shield ;
 
 void setup() 
 {
+  Serial.begin (115200) ;
   AudioMemory (40) ;  // plenty for 2 FFT's each using 8 buffers
   
   // test tones - ensure not simple ratios with sampling frequency, and not harmonically related
-  tone1.frequency (501) ; tone1.amplitude (1.0) ;  mixer.gain (0, 0.89125) ; // -1dB
-  tone2.frequency (1234) ; tone2.amplitude (1.0) ;  mixer.gain (1, 0.1) ;     // -20dB
-  tone3.frequency (2203) ; tone3.amplitude (1.0) ;  mixer.gain (2, 0.01) ;    // -40dB
-  tone4.frequency (3555) ; tone4.amplitude (1.0) ;  mixer.gain (3, 0.001) ;   // -60dB
-  tone5.frequency (4009) ; tone5.amplitude (1.0) ;  mixer2.gain (0, 0.0001) ;  // -80dB  (about 3 LSBs amplitude!)
+  tone1.frequency (freq1) ; tone1.amplitude (1.0) ;  mixer.gain (0, 0.89125) ; // -1dB
+  tone2.frequency (freq2) ; tone2.amplitude (1.0) ;  mixer.gain (1, 0.1) ;     // -20dB
+  tone3.frequency (freq3) ; tone3.amplitude (1.0) ;  mixer.gain (2, 0.01) ;    // -40dB
+  tone4.frequency (freq4) ; tone4.amplitude (1.0) ;  mixer.gain (3, 0.001) ;   // -60dB
+  tone5.frequency (freq5) ; tone5.amplitude (1.0) ;  mixer2.gain (0, 0.0001) ;  // -80dB  (about 3 LSBs amplitude!)
 
   mixer2.gain (1, 1) ;  // mixer to mixer2 unity gain
 
-  // setup same number of points for FFTs and same flattop window.
-  gen_fft.Npoints (1024) ;
+  if (0 == gen_fft.Npoints (POINTS))
+  {
+    Serial.println ("Failed to setup FFT") ;
+    while (true) {}
+  }
   gen_fft.fftWindow (&flattop_window) ;
   exist_fft.windowFunction (AudioWindowFlattop1024) ;
 
@@ -58,10 +75,26 @@ float dB (float val)
   return 20 * log10 (val) ;
 }
 
+int freqp (int index)
+{
+  float f = 44100.0 / POINTS * index ;
+  return int (round (f)) ;
+}
+
+int indexp (float freq)
+{
+  return int (round (freq / 44100.0 * POINTS)) ;
+}
+
 int freq (int index)
 {
   float f = 44100.0 / 1024 * index ;
   return int (round (f)) ;
+}
+
+int index (float freq)
+{
+  return int (round (freq / 44100.0 * 1024)) ;
 }
 
 void plot (float val)  // for ASCII plotting
@@ -78,36 +111,36 @@ void loop()
   
   if (gen_fft.available ())
   {
-    Serial.println ("Generic AudioAnalyzeFFT with 1024 points:") ;
+    Serial.print ("Generic AudioAnalyzeFFT with ") ; Serial.print (POINTS) ; Serial.println (" points:") ;
 #ifndef PLOT
-    for (int i = 9 ; i < 16 ; i ++)  // around tone1
+    for (int i = indexp (freq1)-2 ; i <= indexp (freq1)+2 ; i ++)  // around tone1
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
+      Serial.print (freqp(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
     }
     Serial.println () ;
-    for (int i = 26 ; i < 33 ; i ++)  // around tone2
+    for (int i = indexp (freq2)-2 ; i <= indexp (freq2)+2 ; i ++)  // around tone2
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
+      Serial.print (freqp(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
     }
     Serial.println () ;
-    for (int i = 48 ; i < 55 ; i ++)  // around tone3
+    for (int i = indexp (freq3)-2 ; i <= indexp (freq3)+2 ; i ++)  // around tone3
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
+      Serial.print (freqp(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
     }
     Serial.println () ;
-    for (int i = 79 ; i < 86 ; i ++)  // around tone4
+    for (int i = indexp (freq4)-2 ; i <= indexp (freq4)+2 ; i ++)  // around tone4
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
+      Serial.print (freqp(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
     }
     Serial.println () ;
-    for (int i = 90 ; i < 97 ; i ++)  // around tone5
+    for (int i = indexp (freq5)-2 ; i <= indexp (freq5)+2 ; i ++)  // around tone5
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
+      Serial.print (freqp(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dB (i), 3) ;
     }
     Serial.println ("noise floor:") ;
     for (int i = 150 ; i < 165 ; i ++)  // quiet part of spectrum to see noise floor
     {
-      Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dBNoise (i), 3) ;
+      Serial.print (freqp(i)) ; Serial.print ("Hz ") ; Serial.println (gen_fft.dBNoise (i), 3) ;
     }
 
 #else
@@ -122,27 +155,27 @@ void loop()
   {
     Serial.println ("AudioAnalyzeFFT1024:") ;
 #ifndef PLOT
-    for (int i = 9 ; i < 16 ; i ++)
+    for (int i = index (freq1)-2 ; i <= index (freq1)+2 ; i ++)  // around tone1
     {
       Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (exist_fft.read (i)), 3) ;
     }  
     Serial.println () ;
-    for (int i = 26 ; i < 33 ; i ++)
+    for (int i = index (freq2)-2 ; i <= index (freq2)+2 ; i ++)  // around tone2
     {
       Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (exist_fft.read (i)), 3) ;
     }  
     Serial.println () ;
-    for (int i = 48 ; i < 55 ; i ++)
+    for (int i = index (freq3)-2 ; i <= index (freq3)+2 ; i ++)  // around tone3
     {
       Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (exist_fft.read (i)), 3) ;
     }
     Serial.println () ;
-    for (int i = 79 ; i < 86 ; i ++)
+    for (int i = index (freq4)-2 ; i <= index (freq4)+2 ; i ++)  // around tone4
     {
       Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (exist_fft.read (i)), 3) ;
     }
     Serial.println () ;
-    for (int i = 90 ; i < 97 ; i ++)
+    for (int i = index (freq5)-2 ; i <= index (freq5)+2 ; i ++)  // around tone5
     {
       Serial.print (freq(i)) ; Serial.print ("Hz ") ; Serial.println (dB (exist_fft.read (i)), 3) ;
     }

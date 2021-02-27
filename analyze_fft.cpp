@@ -154,7 +154,7 @@ int AudioAnalyzeFFT::Npoints (unsigned int N_points)
   window = new int16_t [N/2+1] ;
   if (output == NULL || blocklist == NULL || r_buffer == NULL || c_buffer == NULL || window == NULL)
   {
-    //Serial.println ("malloc failed for AudioAnalyzeFFT") ;
+    //Serial.println ("new failed for AudioAnalyzeFFT") ;
     valid = false ;
     return 0 ;
   }
@@ -233,6 +233,9 @@ void AudioAnalyzeFFT::update(void)
       float real = c_buffer [2*i] ;
       float imag = c_buffer [2*i+1] ;
       float mag = sqrt (real*real + imag*imag) ;
+ #ifdef KINETISK
+      mag /= 2 ;  // this works for 512, but 128 seems off...
+ #endif
       output[i] = int (round (mag)) ;
     }
     outputflag = true;
