@@ -136,7 +136,11 @@ int AudioAnalyzeFFT::Npoints (unsigned int N_points)
     
   total_blocks = N / AUDIO_BLOCK_SAMPLES ;
   overlap_blocks = total_blocks >> 1 ;
+#ifdef KINETISK
+  if (arm_rfft_init_q31 (&fft_inst, &cfft_inst, N, 0, 1) != ARM_MATH_SUCCESS)
+#else
   if (arm_rfft_init_q31 (&fft_inst, N, 0, 1) != ARM_MATH_SUCCESS)
+#endif
   {
     //Serial.println ("Bad size for AudioAnalyzeFFT") ;
     valid = false ;

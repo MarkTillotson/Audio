@@ -76,6 +76,9 @@ private:
   volatile bool outputflag;
   audio_block_t * inputQueueArray [1];
   arm_rfft_instance_q31 fft_inst;
+#ifdef KINETISK
+  arm_cfft_radix4_instance_q31 cfft_inst;
+#endif
   uint8_t total_blocks ;
   uint8_t overlap_blocks ;
   volatile bool valid ;
