@@ -24,10 +24,8 @@
  * THE SOFTWARE.
  */
 
-#include <Arduino.h>
-#include "analyze_fft.h"
-#include "sqrt_integer.h"
 #include "utility/dspinst.h"
+#include "analyze_fft.h"
 
 bool AudioAnalyzeFFT::available(void)
   {
@@ -45,7 +43,7 @@ float AudioAnalyzeFFT::read (unsigned int binNumber)
   return (float) output[binNumber] * processing_gain ;
 }
 
-float AudioAnalyzeFFT::read_noise (unsigned int binNumber)
+float AudioAnalyzeFFT::readNoise (unsigned int binNumber)
 {
   if (!valid || binNumber > N/2)
     return 0.0;
@@ -81,8 +79,8 @@ void AudioAnalyzeFFT::fftWindow (FFTWindow * window_desc)
   noise_gain = processing_gain * sqrt (window_desc->noiseBandwidth()) ;
   noise_gain *= sqrt (AUDIO_SAMPLE_RATE_EXACT / N) ;
   // scale for read() methods
-  processing_gain = 1.0 / 0x40000000 / processing_gain ;
-  noise_gain = 1.0 / 0x40000000 / noise_gain ;
+  processing_gain = full_scale / 0x40000000 / processing_gain ;
+  noise_gain = full_scale / 0x40000000 / noise_gain ;
   __enable_irq() ;
 }
 
@@ -101,6 +99,12 @@ void AudioAnalyzeFFT::overlapBlocks (unsigned int blocks)
       }
   }
   __enable_irq() ;
+}
+
+void AudioAnalyzeFFT::fullScaleVolts (float amplitude)
+{
+  if (amplitude > 0)
+    full_scale = amplitude ;
 }
 
 

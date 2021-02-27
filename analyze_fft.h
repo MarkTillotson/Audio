@@ -29,7 +29,6 @@
 
 #include "Arduino.h"
 #include "AudioStream.h"
-#include "arm_math.h"
 #include "fft_windows.h"
 
 
@@ -43,16 +42,18 @@ public:
   AudioAnalyzeFFT (void) : AudioStream (1, inputQueueArray)
   {
     valid = false ;
+    full_scale = 1.0 ;
   }
   
   int Npoints (unsigned int N_points) ;
   
   bool available(void) ;
   float read (unsigned int binNumber) ;
-  float read_noise (unsigned int binNumber) ;
+  float readNoise (unsigned int binNumber) ;
   float read (unsigned int binFirst, unsigned int binLast) ;
   void fftWindow (FFTWindow * window_desc) ;
   void overlapBlocks (unsigned int blocks) ;
+  void fullScaleVolts (float amplitude) ;
 
   virtual void update(void);
   uint32_t * output ;
@@ -78,6 +79,7 @@ private:
   volatile bool valid ;
   volatile float processing_gain ;
   volatile float noise_gain ;
+  volatile float full_scale ;
 };
 
 #endif

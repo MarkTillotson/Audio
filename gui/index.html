@@ -4900,9 +4900,14 @@ double s_freq = .0625;</p>
 		audio octaves are represented by many bins, which are typically read
 		as a group for audio visualization.
 	</p>
-	<p class=func><span class=keyword>read_noise</span>(binNumber);</p>
+	<p class=func><span class=keyword>readNoise</span>(binNumber);</p>
 	<p class=desc>Read a single frequency bin, from 0 to N/2-1 where N is the order of FFT.
 	  The result is scaled for noise floor measurement, not sinusoids.
+	</p>
+	<p class=func><span class=keyword>fullScaleVolts</span>(amplitude);</p>
+	<p class=desc>Set the full scale (peak) voltage to calibrate the output - default is 1.0, so that
+	  a full-scale sinusoid reads as 1.0.  The peak-to-peak voltage is twice this, the rms voltage
+	  of a sinusoid is 1/sqrt(2) time this (70.7%).
 	</p>
 	<p class=func><span class=keyword>fftWindow</span>(window_desc);</p>
 	<p class=desc>Set the window function to be used.  Available window descriptors are
