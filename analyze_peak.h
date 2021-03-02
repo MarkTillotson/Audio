@@ -65,6 +65,16 @@ public:
 		__enable_irq();
 		return (float)(max - min) / 32767.0f;
 	}
+	float readDcAverage(void)
+	{
+		__disable_irq();
+		int32_t min = min_sample;
+		int32_t max = max_sample;
+		min_sample = 32767;
+		max_sample = -32768;
+		__enable_irq();
+		return (max + min) / 65534.0f ;
+	}
 
 	virtual void update(void);
 private:
