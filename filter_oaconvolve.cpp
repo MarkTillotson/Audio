@@ -30,7 +30,7 @@
 
 #if defined(__ARM_ARCH_7EM__)
 
-
+/*
 static void arm_q31_to_q16 (q31_t * src, int16_t * dst, int count)  // assume multiple of 4
 {
   while (count > 0)
@@ -54,6 +54,7 @@ static void arm_q16_to_q31 (int16_t * src, q31_t * dst, int count)  // assume mu
     count -= 4 ;
   }
 }
+*/
 
 void AudioFilterOAConvolve::update (void)
 {
@@ -66,10 +67,11 @@ void AudioFilterOAConvolve::update (void)
   }
 
   // if active:
+  //Serial.print ('.') ;
   
   // input block handling
   audio_block_t * block = receiveWritable();  // reuse it for the output
-  int32_t * q = &in_arr [iptr * AUDIO_BLOCK_SAMPLES] ;
+  q31_t * q = &in_arr [iptr * AUDIO_BLOCK_SAMPLES] ;
   if (block == NULL)  // treat missing input as equivalent to all zeroes
   {
     block = allocate () ;
@@ -78,7 +80,7 @@ void AudioFilterOAConvolve::update (void)
   else
   {
     int16_t * p = block->data ;
-    arm_q16_to_q31 (p, q, AUDIO_BLOCK_SAMPLES) ;
+    arm_q15_to_q31 (p, q, AUDIO_BLOCK_SAMPLES) ;
   }
   iptr = (iptr + 1) % 6 ;
   // input handling done
@@ -93,7 +95,7 @@ void AudioFilterOAConvolve::update (void)
     {
       arm_add_q31 (p, save_arr, p, AUDIO_BLOCK_SAMPLES) ;
     }
-    arm_q31_to_q16 (p, q, AUDIO_BLOCK_SAMPLES) ;
+    arm_q31_to_q15 (p, q, AUDIO_BLOCK_SAMPLES) ;  // working
     transmit (block, 0) ;
     release (block) ;
   }
@@ -108,10 +110,12 @@ void AudioFilterOAConvolve::update (void)
     arm_rfft_q31 (&sample_fft_instance, in_arr, spect_arr) ;
     break ;
   case 1:  // multiply spectra
-    arm_cmplx_mult_cmplx_q31 (spect_arr, filt_spect, spect_arr, 8 * AUDIO_BLOCK_SAMPLES) ;
+    //arm_cmplx_mult_cmplx_q31 (spect_arr, filt_spect, spect_arr, 8 * AUDIO_BLOCK_SAMPLES) ;
+    //arm_scale_q31 (spect_arr, 0x7fffffff, 5, spect_arr, 2*8 * AUDIO_BLOCK_SAMPLES) ; // compensate for convolution gain?
     break ;
   case 2:  // inverse fft
     arm_rfft_q31 (&sample_ifft_instance, spect_arr, out_arr) ;
+    arm_scale_q31 (out_arr, 0x7fffffff, 10, out_arr, 8 * AUDIO_BLOCK_SAMPLES) ; // convert 10.22 to 1.31, factor of 2 as well?
     break ;
   case 3: case 4: // this is when adds are happening in the outputing.
     break ;
@@ -119,6 +123,7 @@ void AudioFilterOAConvolve::update (void)
     arm_copy_q31 (&out_arr [6 * AUDIO_BLOCK_SAMPLES], save_arr, 2 * AUDIO_BLOCK_SAMPLES) ;
     break ;
   }
+
   state = (state + 1) % 6 ;
 }
 
@@ -134,6 +139,13 @@ void AudioFilterOAConvolve::setFIRCoefficients (int size, float * coeffs)
 
   // calculate its spectrum
   arm_rfft_q31 (&sample_fft_instance, in_arr, filt_spect) ;
+  arm_scale_q31 (filt_spect, 0x7fffffff, 9, filt_spect, 2*8*AUDIO_BLOCK_SAMPLES) ; // 10.22 format back to 1.31
+  for (int i = 0 ; i < 20 ; i++)
+  {
+    Serial.print (filt_spect [2*i]) ;
+    Serial.print (" + j ") ;
+    Serial.println (filt_spect [2*i+1]) ;
+  }
 
   // reset in_array to zeros
   arm_fill_q31 (0, in_arr, 8 * AUDIO_BLOCK_SAMPLES) ;

@@ -37,7 +37,7 @@ class AudioFilterOAConvolve : public AudioStream
 public:
   AudioFilterOAConvolve(void) : AudioStream(1, inputQueueArray)
   {
-    state = -1 ; // not active
+    state = -1 ; iptr = -1 ; optr = -1 ; // not active
     arm_rfft_init_q31 (&sample_fft_instance,  8 * AUDIO_BLOCK_SAMPLES, 0, 1) ;
     arm_rfft_init_q31 (&sample_ifft_instance, 8 * AUDIO_BLOCK_SAMPLES, 1, 1) ;
   }
@@ -48,11 +48,11 @@ public:
   void setFIRCoefficients (int size, float * coeffs);
 
 private:
-  q31_t filt_spect [2 * (8 * AUDIO_BLOCK_SAMPLES)] ;
-  q31_t in_arr [8 * AUDIO_BLOCK_SAMPLES] ;
-  q31_t spect_arr [2 * 8 * AUDIO_BLOCK_SAMPLES] ;
-  q31_t out_arr [8 * AUDIO_BLOCK_SAMPLES] ;
-  q31_t save_arr [2 * AUDIO_BLOCK_SAMPLES] ;
+  q31_t filt_spect [2 * (8 * AUDIO_BLOCK_SAMPLES)] ; // filter spectrum
+  q31_t in_arr [8 * AUDIO_BLOCK_SAMPLES] ;         // samples input
+  q31_t spect_arr [2 * 8 * AUDIO_BLOCK_SAMPLES] ;  // working spectrum that gets multiplied by filter
+  q31_t out_arr [8 * AUDIO_BLOCK_SAMPLES] ;        // samples output
+  q31_t save_arr [2 * AUDIO_BLOCK_SAMPLES] ;       // saves for adding
   volatile int state, iptr, optr ;
   audio_block_t * inputQueueArray[1];
   arm_rfft_instance_q31 sample_fft_instance ;
