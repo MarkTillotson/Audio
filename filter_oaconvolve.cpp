@@ -93,7 +93,7 @@ void AudioFilterOAConvolve::update (void)
     int16_t * q = block->data ;
     if (optr < 2)   // if the first two segments, need to add the overlap
     {
-      arm_add_q31 (p, save_arr, p, AUDIO_BLOCK_SAMPLES) ;
+      arm_add_q31 (p, &save_arr [optr*AUDIO_BLOCK_SAMPLES], p, AUDIO_BLOCK_SAMPLES) ;
     }
     arm_q31_to_q15 (p, q, AUDIO_BLOCK_SAMPLES) ;  // working
     transmit (block, 0) ;
@@ -117,14 +117,17 @@ void AudioFilterOAConvolve::update (void)
     arm_rfft_q31 (&sample_ifft_instance, spect_arr, out_arr) ;
     arm_scale_q31 (out_arr, 0x7fffffff, 10, out_arr, 8 * AUDIO_BLOCK_SAMPLES) ; // convert 10.22 to 1.31, factor of 2 as well?
     break ;
-  case 3: case 4: // this is when adds are happening in the outputing.
+  case 3:  // this is when adds are happening in the outputing.
+    break ;
+  case 4:  // this is when adds are happening in the outputing.
+    arm_fill_q31 (0, &in_arr[6 * AUDIO_BLOCK_SAMPLES], 2 * AUDIO_BLOCK_SAMPLES) ;  // re zero in buffer (rfft trashes it?)
     break ;
   case 5:  // do the save copy for next time round
     arm_copy_q31 (&out_arr [6 * AUDIO_BLOCK_SAMPLES], save_arr, 2 * AUDIO_BLOCK_SAMPLES) ;
     break ;
   }
-
   state = (state + 1) % 6 ;
+
 }
 
 
