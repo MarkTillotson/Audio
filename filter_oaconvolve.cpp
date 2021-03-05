@@ -110,8 +110,8 @@ void AudioFilterOAConvolve::update (void)
     arm_rfft_q31 (&sample_fft_instance, in_arr, spect_arr) ;
     break ;
   case 1:  // multiply spectra
-    //arm_cmplx_mult_cmplx_q31 (spect_arr, filt_spect, spect_arr, 8 * AUDIO_BLOCK_SAMPLES) ;
-    //arm_scale_q31 (spect_arr, 0x7fffffff, 5, spect_arr, 2*8 * AUDIO_BLOCK_SAMPLES) ; // compensate for convolution gain?
+    arm_cmplx_mult_cmplx_q31 (spect_arr, filt_spect, spect_arr, 8 * AUDIO_BLOCK_SAMPLES) ;
+    arm_scale_q31 (spect_arr, 0x7fffffff, 3, spect_arr, 2*8 * AUDIO_BLOCK_SAMPLES) ; // compensate for convolution gain?
     break ;
   case 2:  // inverse fft
     arm_rfft_q31 (&sample_ifft_instance, spect_arr, out_arr) ;
@@ -133,6 +133,13 @@ void AudioFilterOAConvolve::setFIRCoefficients (int size, float * coeffs)
   if (size > 8 * AUDIO_BLOCK_SAMPLES)
     size = 8 * AUDIO_BLOCK_SAMPLES ;
 
+  /*
+  float sum = 0.0 ;
+  for (int i = 0 ; i < size ; i++)
+      sum += coeffs[i] ;
+  Serial.print ("coeffs sum ") ; Serial.println (sum) ;
+  */
+  
   arm_fill_q31 (0, in_arr, 8 * AUDIO_BLOCK_SAMPLES) ;
   // place impulse response in in_arr
   arm_float_to_q31 (coeffs, in_arr, size) ;
