@@ -157,7 +157,7 @@ void AudioFilterUnipart::setFIRCoefficients (int size, float * coeffs)
     delete[] filt_spectra ;
     return ;
   }
-  
+
   int index = 0 ;
   for (int i = 0 ; i < Npart ; i++)
   {
