@@ -37,27 +37,34 @@ class AudioFilterUnipart : public AudioStream
 public:
   AudioFilterUnipart(void) : AudioStream(1, inputQueueArray)
   {
-    arm_rfft_fast_init_f32 (&fft_instance, 2 * AUDIO_BLOCK_SAMPLES) ;
+    const int L = AUDIO_BLOCK_SAMPLES ;  // less cumbersome name
+    const int N = 2*L ;  // size of FFT, two audio blocks
+    
+    arm_rfft_fast_init_f32 (&fft_instance, N) ;
     prev_blk = NULL ;
-    state = -1 ; // not active
+    active = false ;
   }
 
   virtual void update (void);
 
-  // Set the filter from FIR coefficients
-  void setFIRCoefficients (int size, float * coeffs);
+  // Set the filter from FIR coefficients, makes active - unless coeffs == NULL, which stops and releases resources
+  void setFIRCoefficients (int size, float * coeffs) ;
+  
+  void pause (void) ;
+  void resume (void) ;
   
 private:
   audio_block_t * inputQueueArray[1];
   arm_rfft_fast_instance_f32 fft_instance ;
-  float in_array    [2 * AUDIO_BLOCK_SAMPLES] ;    // input samples
-  float out_temp    [2 * 2*AUDIO_BLOCK_SAMPLES] ;  // complex destination for multiplies
-  float out_spectra [2 * 2*AUDIO_BLOCK_SAMPLES] ;  // accumulator for spectra
-  float out_array   [2 * AUDIO_BLOCK_SAMPLES] ;    // output samples
-  float * filt_spectra ;                           // filter spectra
-  float * delay_line ;                             // successive FFTs
+  float in_array    [2 * AUDIO_BLOCK_SAMPLES] ;    // float32 input samples
+  float out_spectra [2 * 2*AUDIO_BLOCK_SAMPLES] ;  // complex32 accumulator for spectra
+  float out_array   [2 * AUDIO_BLOCK_SAMPLES] ;    // float32 output samples
+  float * filt_spectra ;                           // the partitioned spectra, allocated dynamically
+  float * delay_line ;                             // successive FFTs go in here, allocated dynamically
   audio_block_t * prev_blk ;
-  volatile int state, Npart ;
+  int state ;                             // indexes the delay line and is -1 to stop everything
+  int Npart ;                             // number of partitions, each of size L
+  volatile bool active ;                             // number of partitions, each of size L
 } ;
 
 #endif
