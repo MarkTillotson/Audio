@@ -48,12 +48,14 @@ public:
   void setFIRCoefficients (int size, float * coeffs);
   
 private:
+  audio_block_t * inputQueueArray[1];
   arm_rfft_fast_instance_f32 fft_instance ;
-  float in_array    [2 * AUDIO_BLOCK_SAMPLES] ;
-  float out_spectra [2 * 2*AUDIO_BLOCK_SAMPLES] ;
-  float out_array   [2 * AUDIO_BLOCK_SAMPLES] ;
-  float * filt_spectra ;
-  float * delay_line ;
+  float in_array    [2 * AUDIO_BLOCK_SAMPLES] ;    // input samples
+  float out_temp    [2 * 2*AUDIO_BLOCK_SAMPLES] ;  // complex destination for multiplies
+  float out_spectra [2 * 2*AUDIO_BLOCK_SAMPLES] ;  // accumulator for spectra
+  float out_array   [2 * AUDIO_BLOCK_SAMPLES] ;    // output samples
+  float * filt_spectra ;                           // filter spectra
+  float * delay_line ;                             // successive FFTs
   audio_block_t * prev_blk ;
   volatile int state, Npart ;
 } ;

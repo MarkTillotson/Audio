@@ -42,46 +42,47 @@ void AudioFilterUnipart::update (void)
   audio_block_t * block = receiveReadOnly();
   audio_block_t * out_blk = NULL ;
 
-  if (prev == NULL)
+  if (prev_blk == NULL)
   {
     arm_fill_f32 (0.0, in_array, AUDIO_BLOCK_SAMPLES) ;
     out_blk = allocate () ;
   }
   else
   {
-    arm_q15_to_float (prev->data, in_array, AUDIO_BLOCK_SAMPLES) ;
-    out_blk = prev ;
+    arm_q15_to_float (prev_blk->data, in_array, AUDIO_BLOCK_SAMPLES) ;
+    out_blk = prev_blk ;
   }
   
   if (block == NULL)
   {
     arm_fill_f32 (0.0, in_array + AUDIO_BLOCK_SAMPLES, AUDIO_BLOCK_SAMPLES) ;
-    prev = NULL ;
+    prev_blk = NULL ;
   }
   else
   {
     arm_q15_to_float (block->data, in_array + AUDIO_BLOCK_SAMPLES, AUDIO_BLOCK_SAMPLES) ;
-    prev = block ;
+    prev_blk = block ;
   }
 
-  arm_rfft_fast_32 (in_array, delay_line + state * 2*AUDIO_BLOCK_SAMPLES, 0, 1) ;
+  arm_rfft_fast_f32 (&fft_instance, in_array, delay_line + state * 2*AUDIO_BLOCK_SAMPLES, 0) ;
 
   for (int i = 0 ; i < Npart ; i++)
   {
     int del_index = (state + Npart - i) % Npart ;
-    arm_mult_complex_f32 (filt_spectra + i * 2*AUDIO_BLOCK_SAMPLES,  // needs to mult accumulate
-			  delay_line + del_index * 2*AUDIO_BLOCK_SAMPLES,
-			  out_spectra,
-			  AUDIO_BLOCK_SAMPLES) ;
+    arm_cmplx_mult_cmplx_f32 (filt_spectra + i * 2*AUDIO_BLOCK_SAMPLES,  // needs to mult accumulate
+			      delay_line + del_index * 2*AUDIO_BLOCK_SAMPLES,
+			      out_temp,
+			      AUDIO_BLOCK_SAMPLES) ;
+    arm_add_f32 (out_temp, out_spectra, out_spectra, 2*AUDIO_BLOCK_SAMPLES) ;
     
   }
   state = (state + 1) % Npart ;
 
-  arm_rfft_fast_32 (out_spectra, out_array, 1, 1) ;
+  arm_rfft_fast_f32 (&fft_instance, out_spectra, out_array, 1) ;  // inverse fft
 
   if (out_blk != NULL)
   {
-    arm_copy_f32 (out_array + AUDIO_BLOCK_SAMPLES, out_blk->data, AUDIO_BLOCK_SAMPLES) ;
+    arm_float_to_q15 (out_array + AUDIO_BLOCK_SAMPLES, out_blk->data, AUDIO_BLOCK_SAMPLES) ;
     transmit (out_blk) ;
     release (out_blk) ;
   }
@@ -108,7 +109,7 @@ void AudioFilterUnipart::setFIRCoefficients (int size, float * coeffs)
   {
     arm_copy_f32 (coeffs + index, in_array, AUDIO_BLOCK_SAMPLES) ;
     arm_fill_f32 (0.0, in_array + AUDIO_BLOCK_SAMPLES, AUDIO_BLOCK_SAMPLES) ;
-    arm_rfft_fast_32 (in_array, filt_spectra + 2*index, 0, 1) ;
+    arm_rfft_fast_f32 (&fft_instance, in_array, filt_spectra + 2*index, 0) ;
     index += AUDIO_BLOCK_SAMPLES ;
   }
   arm_fill_f32 (0.0, delay_line, (Npart+1) * 2*AUDIO_BLOCK_SAMPLES) ;
