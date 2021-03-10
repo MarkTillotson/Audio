@@ -30,8 +30,8 @@
 #if defined(__ARM_ARCH_7EM__)
 
 
-
-
+// reconstruct negative frequency bins, and nyquist bin (set to zero)
+// this is used to reduce workload and workspace as only real data is assumed
 inline void reconstruct_neg_freqs (float * spect, int Npoints)
 {
   int i = 2 ;
@@ -51,13 +51,13 @@ inline void mul_acc_spectrum (float * filt_spectrum,
 			      float * out_spectrum,
 			      int Nbins)
 {
-  float out_temp [2*Nbins] ;
+  float out_temp [2*Nbins] ;  // need temporary storage as CMSIS lacks mulAcc for complex.
   arm_cmplx_mult_cmplx_f32 (filt_spectrum, in_spectrum, out_temp, Nbins) ; // multiply...
   arm_add_f32 (out_temp, out_spectrum, out_spectrum, 2*Nbins) ; // ...accumulate
 }
 
 
-// allows inc to be negative without breaking due to C semantics for % operator being wrong.
+// modular inc/dec that works for negative inc.  C % operator is non-mathematical alas.
 inline void inc_mod (int & a, int inc, int b)
 {
   a = (a + inc + b) % b ;
@@ -74,13 +74,13 @@ void AudioFilterUnipart::update (void)
     return ;
   }
 
-  const int L = AUDIO_BLOCK_SAMPLES ;  // less cumbersome
-  const int N = 2*L ;
+  const int L = AUDIO_BLOCK_SAMPLES ;  // processing chunk size
+  const int N = 2*L ;                  // FFT size, two chunks, overlap-save style.
 
-  audio_block_t * block = receiveWritable();  // since passed down via prev_blk to out_blk
+  audio_block_t * block = receiveWritable();  // passed down via prev_blk to out_blk, so not readOnly
   audio_block_t * out_blk = NULL ;
 
-  // the in_array gets the previous and curret blocks samples, and we have
+  // the in_array gets the previous and current blocks samples (FFT covers 2 blocks) and we have
   // to handle lack of blocks as if were zero:
   if (prev_blk == NULL)
   {
@@ -101,32 +101,32 @@ void AudioFilterUnipart::update (void)
   prev_blk = block ;
 
 
-  // write latest spectrum to relevant slot in the delay_line, end of input processing
+  // write latest spectrum to relevant slot in the delay_line
   arm_rfft_fast_f32 (&fft_instance, in_array, delay_line + state * 2*L, 0) ;
-  inc_mod (state, 1, Npart+1) ;  // state indexes delay_line, 
+  inc_mod (state, 1, Npart+1) ;  // state indexes delay_line,
+
+  // the rest is output processing only, doesn't affect future state:
 
   if (out_blk != NULL)  // if starved of blocks, don't bother doing the output stuff
   {
-    arm_fill_f32 (0.0, out_spectra, 2*L) ; // clear the output accumulator
+    arm_fill_f32 (0.0, out_spectra, 2*L) ; // zero the output accumulator (DC / positive bins only)
     int del_index = state ;
     for (int i = 0 ; i < Npart ; i++)      // loop through all the filter partitions
     {
       inc_mod (del_index, -1, Npart+1) ;  // delayline index goes backwards (it is a convolution, not correlation!)
-      // multiply each delayline spectrum by relevant filter spectrum, accumulate in out_spectra
+      // multiply each delayline spectrum by relevant filter spectrum, accumulate in out_spectra (DC / positive bins only)
       mul_acc_spectrum (filt_spectra + i * 2*L,
 			delay_line + del_index * 2*L,
 			out_spectra,
 			L) ;
     }
-    reconstruct_neg_freqs (out_spectra, N) ;  // we only bothered above with positive frequency bins...
+    reconstruct_neg_freqs (out_spectra, N) ;  // needed only once before IFFT
+    arm_rfft_fast_f32 (&fft_instance, out_spectra, out_array, 1) ;  // 1 means inverse FFT
 
-    arm_rfft_fast_f32 (&fft_instance, out_spectra, out_array, 1) ;  // 1 means inverse fft
-
-    arm_float_to_q15 (out_array + L, out_blk->data, L) ;  // just needs second half of samples
+    arm_float_to_q15 (out_array + L, out_blk->data, L) ;  // just need second half of samples (overlap-save)
     transmit (out_blk) ;
     release (out_blk) ;
   }
-  
 }
 
 
@@ -134,32 +134,39 @@ void AudioFilterUnipart::setFIRCoefficients (int size, float * coeffs)
 {
   const int L = AUDIO_BLOCK_SAMPLES ;  // less cumbersome
 
-  if (coeffs == NULL)  // shutdown and release resources:
-  {
-    Npart = 0 ;
-    state = 0 ;
-    if (filt_spectra != NULL)
-      delete[] filt_spectra ;
-    if (delay_line != NULL)
-      delete[] delay_line ;
-    active = false ;
-  }
+  __disable_irq() ;  // turn off update() before tinkering
+  Npart = -1 ;
+  active = false ;
+  __enable_irq() ;
 
-  Npart = (size + L-1) / L ;  // setup state for update() loop
-  state = 0 ;
+  // tidy previous state
+  if (filt_spectra != NULL) delete[] filt_spectra ;
+  if (delay_line != NULL)   delete[] delay_line ;
+  filt_spectra = NULL ;
+  delay_line = NULL ;
+  
+  if (size == 0 || coeffs == NULL)  // shutdown and release resources if no new filter
+    return ;
 
-  filt_spectra = new float [(Npart + 1) * 2*L] ;  // entries overlap by L complex values, need extra L complex at end
+  int number_parts = (size + L-1) / L ;  // setup state for update() loop
+
+  filt_spectra = new float [(number_parts + 1) * 2*L] ;  // entries overlap by L complex values, need extra L complex at end
   if (filt_spectra == NULL)
     return ;
-  delay_line = new float [(Npart + 2) * 2*L] ;    // entries overlap by L complex values, and we also wrap, need two extra L at end
+  delay_line = new float [(number_parts + 2) * 2*L] ;    // entries overlap by L complex values, and we also wrap, need two extra L at end
   if (delay_line == NULL)
   {
     delete[] filt_spectra ;
+    filt_spectra = NULL ;
     return ;
   }
 
+  //Serial.print ("Npart ") ; Serial.println (number_parts) ;
+  //int cmults = 2 * 8 * 256/2 + number_parts * L;
+  //Serial.print (1.0*cmults/L) ; Serial.println (" complex muls per sample") ;
+
   int index = 0 ;
-  for (int i = 0 ; i < Npart ; i++)
+  for (int i = 0 ; i < number_parts ; i++)
   {
     arm_copy_f32 (coeffs + index, in_array, L) ;
     if (index+L > size)
@@ -170,20 +177,40 @@ void AudioFilterUnipart::setFIRCoefficients (int size, float * coeffs)
     arm_rfft_fast_f32 (&fft_instance, in_array, filt_spectra + 2*index, 0) ;  // store filt spectrum
     index += L ;
   }
-  arm_fill_f32 (0.0, delay_line, (Npart+1) * 2*L) ;  // zero out delay line for clean startup
+  arm_fill_f32 (0.0, delay_line, (number_parts+1) * 2*L) ;  // zero out delay line for clean startup
 
+  __disable_irq() ;
+  state = 0 ;
+  Npart = number_parts ;
   active = true ;  // enable the update() method to start processing
+  __enable_irq() ;
 }
 
 
 void AudioFilterUnipart::pause (void)
 {
+  __disable_irq ();
   active = false ;
+  __enable_irq ();
 }
 
 void AudioFilterUnipart::resume (void)
 {
-  active = true ;
+  __disable_irq ();
+  if (Npart > 0)   // can only resume if a filter has been defined
+    active = true ;
+  __enable_irq ();
+}
+
+int AudioFilterUnipart::partitionCount (void)
+{
+  return Npart ;
+}
+
+int AudioFilterUnipart::heapUsage (void)
+{
+  const int L = AUDIO_BLOCK_SAMPLES ;  // processing chunk size
+  return 4 * ((Npart + 1) * 2*L + (Npart + 2) * 2*L) ; //bytes used by filt_spectra and delay_line
 }
 
 

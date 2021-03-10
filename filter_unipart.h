@@ -42,6 +42,9 @@ public:
     
     arm_rfft_fast_init_f32 (&fft_instance, N) ;
     prev_blk = NULL ;
+    filt_spectra = NULL ;
+    delay_line = NULL ;
+    Npart = -1 ; // signals no valid filter
     active = false ;
   }
 
@@ -52,6 +55,8 @@ public:
   
   void pause (void) ;
   void resume (void) ;
+  int partitionCount (void) ;
+  int heapUsage (void) ;
   
 private:
   audio_block_t * inputQueueArray[1];
@@ -63,7 +68,7 @@ private:
   float * delay_line ;                             // successive FFTs go in here, allocated dynamically
   audio_block_t * prev_blk ;
   int state ;                             // indexes the delay line and is -1 to stop everything
-  int Npart ;                             // number of partitions, each of size L
+  volatile int Npart ;                             // number of partitions, each of size L
   volatile bool active ;                             // number of partitions, each of size L
 } ;
 
