@@ -184,8 +184,8 @@ float big_coeffs [] =  // complicated dual band-pass filter with 1920 coefficien
   -1.06716265888e-08, -1.07862714517e-08, -8.59391262673e-09, -4.59819635001e-09, 3.19475522742e-10, 5.09406619728e-09, 8.7073186299e-09, 1.0404667549e-08, 9.85249539998e-09, 7.20303063688e-09, 3.05442303498e-09, -1.68387674924e-09, -5.99022165726e-09, -8.9508229447e-09, -9.95340600283e-09, -8.81348039377e-09,
 };
 
-// null filter
-float null_coeffs [] = { 1.0 } ;
+// very short impulse response!
+float short_coeffs [] = { 0.5, 0.5 } ; 
 
 // moving average
 float runavg_coeffs [] = 
@@ -216,13 +216,16 @@ void setup()
   sgtl5000_1.enable();
   sgtl5000_1.inputSelect(myInput);
   sgtl5000_1.micGain (52) ;
+  sgtl5000_1.lineInLevel (11) ;
+  sgtl5000_1.lineOutLevel (13) ;
+  sgtl5000_1.unmuteLineout();
   sgtl5000_1.volume(0.35);
 
   // alternative filters:
   
   //convolution.setFIRCoefficients (sizeof (coeffs) / sizeof (float), coeffs) ;
   convolution.setFIRCoefficients (sizeof (big_coeffs) / sizeof (float), big_coeffs) ;
-  //convolution.setFIRCoefficients (sizeof (null_coeffs) / sizeof (float), null_coeffs) ;
+  //convolution.setFIRCoefficients (sizeof (short_coeffs) / sizeof (float), short_coeffs) ;
   //convolution.setFIRCoefficients (sizeof (runavg_coeffs) / sizeof (float), runavg_coeffs) ;
 
   Serial.print ("number of partitions ") ; Serial.println (convolution.partitionCount()) ;
