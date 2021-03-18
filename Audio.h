@@ -91,6 +91,7 @@
 #include "filter_fir.h"
 #include "filter_variable.h"
 #include "filter_ladder.h"
+#include "filter_crossover.h"
 #include "input_adc.h"
 #include "input_adcs.h"
 #include "input_i2s.h"
