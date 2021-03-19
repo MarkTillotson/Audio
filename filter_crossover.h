@@ -81,7 +81,7 @@ public:
   
   virtual void update(void);
 
-  bool setStages (int ways)
+  bool setWays (int ways)
   {
     if (ways < 2) return false ;
     if (ways > 4) return false ;
@@ -91,32 +91,32 @@ public:
 
   bool setLowpass (unsigned int stage, FilterSpec * lowpass)
   {
-    if (stage >= stages) return false ;
+    if (stage < 1 || stage > stages) return false ;
     specs [stage * 2 - 2] = lowpass ;
     return true ;
   }
 	
   bool setHighpass (unsigned int stage, FilterSpec * highpass)
   {
-    if (stage >= stages) return false ;
+    if (stage < 1 || stage > stages) return false ;
     specs [stage * 2 - 1] = highpass ;
     return true ;
   }
 
   bool setFilters (unsigned int stage, FilterSpec * lowpass, FilterSpec * highpass)
   {
-    if (stage >= stages) return false ;
+    if (stage < 1 || stage > stages) return false ;
     specs [stage * 2 - 2] = lowpass ;
     specs [stage * 2 - 1] = highpass ;
     return true ;
   }
 
-  bool setCrossoverFreq (unsigned int stage, float freq, int crossover_type)
+  bool setCrossoverFreq (unsigned int stage, float freq, int crossover_type, int order)
   {
-    if (stage >= stages || crossover_type > LAST_CROSSOVER_TYPE)
+    if (stage < 1 || stage > stages || crossover_type > LAST_CROSSOVER_TYPE)
       return false ;
-    specs [stage * 2 - 2] = crossover_lowpass_for (freq, crossover_type) ;
-    specs [stage * 2 - 1] = crossover_highpass_for (freq, crossover_type) ;
+    specs [stage * 2 - 2] = crossover_lowpass_for (freq, crossover_type, order) ;
+    specs [stage * 2 - 1] = crossover_highpass_for (freq, crossover_type, order) ;
     return true ;
   }
 
@@ -129,8 +129,8 @@ private:
   float right_samples [AUDIO_BLOCK_SAMPLES] ;
   
   void output_to_block (int chan, float * samples) ;
-  FilterSpec * crossover_lowpass_for (float freq, int crossover_type) ;
-  FilterSpec * crossover_highpass_for (float freq, int crossover_type) ;
+  FilterSpec * crossover_lowpass_for (float freq, int crossover_type, int order) ;
+  FilterSpec * crossover_highpass_for (float freq, int crossover_type, int order) ;
 };
 
 #endif

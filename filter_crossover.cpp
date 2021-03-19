@@ -138,6 +138,225 @@ static void apply_filter (FilterSpec * filter, float * samples)
 }
 
 
+static void bilinear_z_transform (float * s)
+{
+  float u = 1 + s[0] ;
+  float v =   + s[1] ;
+  float x = 1 - s[0] ;
+  float y =   - s[1] ;
+  float scale = 1.0 / (x*x + y*y) ;
+  float xnum = u*x + v*y ;
+  float ynum = v*x - u*y ;
+  s[0] = xnum * scale ;
+  s[1] = ynum * scale ;
+}
+
+
+static void get_butterworth_poles (float f, int order, float * poles)
+{
+  float omega = 2 * M_PI * f ;
+  if (order & 1)
+  {
+    *poles++ = -omega ;
+    *poles++ = 0.0 ;
+    bilinear_z_transform (poles-2) ;
+    for (int i = 2 ; i < order ; i+=2)
+    {
+      float angle = i * 0.5 * M_PI / order ;
+      *poles++ = -omega * cos(angle) ;
+      *poles++ =  omega * sin(angle) ;
+      bilinear_z_transform (poles-2) ;
+    }
+  }
+  else
+  {
+    for (int i = 1 ; i < order ; i+=2)
+    {
+      float angle = i * 0.5 * M_PI / order ;
+      *poles++ = -omega * cos(angle) ;
+      *poles++ =  omega * sin(angle) ;
+      bilinear_z_transform (poles-2) ;
+    }
+  }
+}
+
+static void sos_coeffs_for_1st_order (float * sos_coeffs, float x, bool low_pass)
+{
+  float gain = 2.0 / (1-x) ;
+  sos_coeffs[0] = 1.0 / gain ;
+  sos_coeffs[1] = low_pass ? 1.0 / gain : -1.0 / gain ;
+  sos_coeffs[2] = 0.0 ;
+  sos_coeffs[3] = 1.0 ;
+  sos_coeffs[4] = -x ;
+  sos_coeffs[5] = 0.0 ;
+}
+
+static void sos_coeffs_for_squared_1st_order (float * sos_coeffs, float x, bool low_pass)
+{
+  float gain = 2.0 * 2.0 / ((1-x)*(1-x)) ;
+  sos_coeffs[0] = 1.0 / gain ;
+  sos_coeffs[1] = low_pass ? 2.0 / gain : -2.0 / gain ;
+  sos_coeffs[2] = 1.0 / gain ;
+  sos_coeffs[3] = 1.0 ;
+  sos_coeffs[4] = -2.0 * x ;
+  sos_coeffs[5] = x*x ;
+}
+
+static void sos_coeffs_for_2nd_order (float * sos_coeffs, float x, float y, bool low_pass)
+{
+  float gain = 2.0 * 2.0 / ((1-x)*(1-x) + y*y) ;
+  sos_coeffs[0] = 1.0 / gain ;
+  sos_coeffs[1] = low_pass ? 2.0 / gain : -2.0 / gain ;
+  sos_coeffs[2] = 1.0 / gain ;
+  sos_coeffs[3] = 1.0 ;
+  sos_coeffs[4] = -2.0 * x ;
+  sos_coeffs[5] = x*x + y*y ;
+}
+
+
+FilterSpec * AudioFilterCrossover::crossover_lowpass_for (float freq, int crossover_type, int order)
+{
+  float poles [2 * FILTERSPEC_MAX_SOS_SECTIONS] ;
+  switch (crossover_type)
+  {
+  case CROSSOVER_TYPE_BUTTERWORTH:
+    {
+      if (order < 1 || order > 2 * FILTERSPEC_MAX_SOS_SECTIONS)
+	return NULL ;
+      get_butterworth_poles (freq / AUDIO_SAMPLE_RATE_EXACT, order, poles) ;
+      float sos_coeffs [6 * FILTERSPEC_MAX_SOS_SECTIONS] ;
+      int index = 0 ;
+      if (order & 1)
+      {
+	sos_coeffs_for_1st_order (sos_coeffs, poles[0], true) ;
+	index += 6 ;
+	for (int i = 2 ; i < order ; i+=2)
+	{
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i], poles[i+1], true) ;
+	  index += 6 ;
+	}
+      }
+      else
+      {
+	for (int i = 1 ; i < order ; i+=2)
+	{
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i-1], poles[i], true) ;
+	  index += 6 ;
+	}
+      }
+      return new FilterSpecIIR ((order+1) / 2, sos_coeffs) ;
+    }
+    break ;
+    
+  case CROSSOVER_TYPE_LINKWITZ_RILEY:
+    {
+      if (order < 2 || order > 2 * FILTERSPEC_MAX_SOS_SECTIONS || (order & 1) == 1)
+	return NULL ;
+      int border = order/2 ;
+      get_butterworth_poles (freq / AUDIO_SAMPLE_RATE_EXACT, border, poles) ;
+      float sos_coeffs [6 * FILTERSPEC_MAX_SOS_SECTIONS] ;
+      int index = 0 ;
+      if (border & 1)
+      {
+	sos_coeffs_for_squared_1st_order (sos_coeffs+index, poles[0], true) ;
+	index += 6 ;
+	for (int i = 2 ; i < border ; i+=2)
+	{
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i], poles[i+1], true) ;
+	  index += 6 ;
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i], poles[i+1], true) ;
+	  index += 6 ;
+	}
+      }
+      else
+      {
+	for (int i = 1 ; i < border ; i+=2)
+	{
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i-1], poles[i], true) ;
+	  index += 6 ;
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i-1], poles[i], true) ;
+	  index += 6 ;
+	}
+      }
+      return new FilterSpecIIR (order / 2, sos_coeffs) ;
+    }
+    break ;
+  }
+  return NULL ;
+}
+
+FilterSpec * AudioFilterCrossover::crossover_highpass_for (float freq, int crossover_type, int order)
+{
+  float poles [2 * FILTERSPEC_MAX_SOS_SECTIONS] ;
+  switch (crossover_type)
+  {
+  case CROSSOVER_TYPE_BUTTERWORTH:
+    {
+      if (order < 1 || order > 2 * FILTERSPEC_MAX_SOS_SECTIONS)
+	return NULL ;
+      get_butterworth_poles (freq / AUDIO_SAMPLE_RATE_EXACT, order, poles) ;
+      float sos_coeffs [6 * FILTERSPEC_MAX_SOS_SECTIONS] ;
+      int index = 0 ;
+      if (order & 1)
+      {
+	sos_coeffs_for_1st_order (sos_coeffs, poles[0], false) ;
+	index += 6 ;
+	for (int i = 2 ; i < order ; i+=2)
+	{
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i], poles[i+1], false) ;
+	  index += 6 ;
+	}
+      }
+      else
+      {
+	for (int i = 1 ; i < order ; i+=2)
+	{
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i-1], poles[i], false) ;
+	  index += 6 ;
+	}
+      }
+      return new FilterSpecIIR ((order+1) / 2, sos_coeffs) ;
+    }
+    break ;
+    
+  case CROSSOVER_TYPE_LINKWITZ_RILEY:
+    {
+      if (order < 2 || order > 2 * FILTERSPEC_MAX_SOS_SECTIONS || (order & 1) == 1)
+	return NULL ;
+      int border = order/2 ;
+      get_butterworth_poles (freq / AUDIO_SAMPLE_RATE_EXACT, border, poles) ;
+      float sos_coeffs [6 * FILTERSPEC_MAX_SOS_SECTIONS] ;
+      int index = 0 ;
+      if (border & 1)
+      {
+	sos_coeffs_for_squared_1st_order (sos_coeffs+index, poles[0], false) ;
+	index += 6 ;
+	for (int i = 2 ; i < border ; i+=2)
+	{
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i], poles[i+1], false) ;
+	  index += 6 ;
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i], poles[i+1], false) ;
+	  index += 6 ;
+	}
+      }
+      else
+      {
+	for (int i = 1 ; i < border ; i+=2)
+	{
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i-1], poles[i], false) ;
+	  index += 6 ;
+	  sos_coeffs_for_2nd_order (sos_coeffs + index, poles[i-1], poles[i], false) ;
+	  index += 6 ;
+	}
+      }
+      return new FilterSpecIIR (order / 2, sos_coeffs) ;
+    }
+    break ;
+  }
+  return NULL ;
+}
+
+
 void AudioFilterCrossover::update (void)
 {
   if (stages == 0)
