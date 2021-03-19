@@ -37,7 +37,7 @@ class FilterSpec
 public:
   FilterSpec () {}
 
-  virtual void apply (int n, float * samples) = 0 ;
+  virtual void apply (int n, float * samples, bool alt_state) = 0 ;
 };
 
 
@@ -55,12 +55,13 @@ public:
     initialize (_sos_count, _sos_coeffs) ;
   }
 
-  virtual void apply (int n, float * samples) ;
+  virtual void apply (int n, float * samples, bool alt_state) ;
 
 private:
   unsigned int sos_count ;
   float sos_coeffs [6 * FILTERSPEC_MAX_SOS_SECTIONS] ;
   float sos_state  [2 * FILTERSPEC_MAX_SOS_SECTIONS] ;
+  float sos_state2 [2 * FILTERSPEC_MAX_SOS_SECTIONS] ;
 
   void initialize (unsigned int _sos_count, float * _sos_coeffs) ;
   void sos_apply (float * state, float * coeffs, int n, float * samples) ;
@@ -128,6 +129,7 @@ private:
   float left_samples [AUDIO_BLOCK_SAMPLES] ;
   float right_samples [AUDIO_BLOCK_SAMPLES] ;
   
+  void input_from_block (audio_block_t * block, float * samples) ;
   void output_to_block (int chan, float * samples) ;
   FilterSpec * crossover_lowpass_for (float freq, int crossover_type, int order) ;
   FilterSpec * crossover_highpass_for (float freq, int crossover_type, int order) ;

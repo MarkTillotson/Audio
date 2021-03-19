@@ -46,10 +46,10 @@ void FilterSpecIIR::initialize (unsigned int _sos_count, float * _sos_coeffs)
 }
 
 
-void FilterSpecIIR::apply (int n, float * samples)
+void FilterSpecIIR::apply (int n, float * samples, bool alt_state)
 {
   for (unsigned int i = 0 ; i < sos_count ; i++)
-    sos_apply (sos_state + 2*i, sos_coeffs + 6*i, n, samples) ;
+    sos_apply ((alt_state ? sos_state2 : sos_state) + 2*i, sos_coeffs + 6*i, n, samples) ;
 }
 
 
@@ -59,66 +59,34 @@ void FilterSpecIIR::sos_apply (float * state, float * coeffs, int n, float * sam
   float b0 = 1.0/coeffs[3], b1 = coeffs[4], b2 = coeffs[5] ;
   float s1 = state[0], s2 = state[1] ;
 
-  if (a0 == 1.0 && a1 == 2.0 && a2 == 1.0)  // quicker case for most low pass stages (zeroes both at Nyquist)
+  for (int i = 0 ; i < n ; i++)
   {
-    for (int i = 0 ; i < n ; i++)
-    {
-      float val = samples[i] ;
-      val -= b1 * s1 ;
-      val -= b2 * s2 ;
-      val *= b0 ;  // this coefficient we reciprocated already to avoid a division here.
-      float s0 = val ;
-      val += 2 * s1 ;
-      val += s2 ;
-      samples[i] = val ;
-      s2 = s1 ;
-      s1 = s0 ;
-    }
-  }
-  else if (a0 == 1.0 && a1 == -2.0 && a2 == 1.0)  // quicker case for most high pass stages (zeroes both at DC)
-  {
-    for (int i = 0 ; i < n ; i++)
-    {
-      float val = samples[i] ;
-      val -= b1 * s1 ;
-      val -= b2 * s2 ;
-      val *= b0 ;  // this coefficient we reciprocated already to avoid a division here.
-      float s0 = val ;
-      val -= 2 * s1 ;
-      val += s2 ;
-      samples[i] = val ;
-      s2 = s1 ;
-      s1 = s0 ;
-    }
-  }
-  else
-  {
-    for (int i = 0 ; i < n ; i++)
-    {
-      float val = samples[i] ;
-      val -= b1 * s1 ;
-      val -= b2 * s2 ;
-      val *= b0 ;  // this coefficient we reciprocated already to avoid a division here.
-      float s0 = val ;
-      val *= a0 ;
-      val += a1 * s1 ;
-      val += a2 * s2 ;
-      samples[i] = val ;
-      s2 = s1 ;
-      s1 = s0 ;
-    }
+    float val = samples[i] ;
+    val -= b1 * s1 ;
+    val -= b2 * s2 ;
+    val *= b0 ;  // this coefficient we reciprocated already to avoid a division here.
+    float s0 = val ;
+    val *= a0 ;
+    val += a1 * s1 ;
+    val += a2 * s2 ;
+    samples[i] = val ;
+    s2 = s1 ;
+    s1 = s0 ;
   }
   state[0] = s1 ;
   state[1] = s2 ;
 }
 
 
-static void input_from_block (audio_block_t * block, float * samples)
+void AudioFilterCrossover::input_from_block (audio_block_t * block, float * samples)
 {
   if (block == NULL)
     arm_fill_f32 (0.0, samples, AUDIO_BLOCK_SAMPLES) ;
   else
+  {
     arm_q15_to_float (block->data, samples, AUDIO_BLOCK_SAMPLES) ;
+    release (block) ;
+  }
 }
 
 void AudioFilterCrossover::output_to_block (int chan, float * samples)
@@ -131,10 +99,10 @@ void AudioFilterCrossover::output_to_block (int chan, float * samples)
   release (block) ;
 }
 
-static void apply_filter (FilterSpec * filter, float * samples)
+static void apply_filter (FilterSpec * filter, float * samples, bool alternate_state)
 {
   if (filter != NULL)
-    filter->apply (AUDIO_BLOCK_SAMPLES, samples) ;
+    filter->apply (AUDIO_BLOCK_SAMPLES, samples, alternate_state) ;
 }
 
 
@@ -154,7 +122,7 @@ static void bilinear_z_transform (float * s)
 
 static void get_butterworth_poles (float f, int order, float * poles)
 {
-  float omega = 2 * M_PI * f ;
+  float omega = M_PI * f ;
   if (order & 1)
   {
     *poles++ = -omega ;
@@ -182,35 +150,38 @@ static void get_butterworth_poles (float f, int order, float * poles)
 
 static void sos_coeffs_for_1st_order (float * sos_coeffs, float x, bool low_pass)
 {
-  float gain = 2.0 / (1-x) ;
+  float gain = low_pass ? 2.0 / (1-x) : 2.0 / (1+x) ;
   sos_coeffs[0] = 1.0 / gain ;
   sos_coeffs[1] = low_pass ? 1.0 / gain : -1.0 / gain ;
   sos_coeffs[2] = 0.0 ;
   sos_coeffs[3] = 1.0 ;
   sos_coeffs[4] = -x ;
   sos_coeffs[5] = 0.0 ;
+  //Serial.printf ("1st order %f %f %f %f %f %f\n", sos_coeffs[0], sos_coeffs[1], sos_coeffs[2], sos_coeffs[3], sos_coeffs[4], sos_coeffs[5]) ;
 }
 
 static void sos_coeffs_for_squared_1st_order (float * sos_coeffs, float x, bool low_pass)
 {
-  float gain = 2.0 * 2.0 / ((1-x)*(1-x)) ;
+  float gain = low_pass ? 2.0 * 2.0 / ((1-x)*(1-x)) : 2.0 * 2.0 / ((1+x)*(1+x)) ;
   sos_coeffs[0] = 1.0 / gain ;
   sos_coeffs[1] = low_pass ? 2.0 / gain : -2.0 / gain ;
   sos_coeffs[2] = 1.0 / gain ;
   sos_coeffs[3] = 1.0 ;
   sos_coeffs[4] = -2.0 * x ;
   sos_coeffs[5] = x*x ;
+  //Serial.printf ("1st order sq %f %f %f %f %f %f\n", sos_coeffs[0], sos_coeffs[1], sos_coeffs[2], sos_coeffs[3], sos_coeffs[4], sos_coeffs[5]) ;
 }
 
 static void sos_coeffs_for_2nd_order (float * sos_coeffs, float x, float y, bool low_pass)
 {
-  float gain = 2.0 * 2.0 / ((1-x)*(1-x) + y*y) ;
+  float gain = low_pass ? 2.0 * 2.0 / ((1-x)*(1-x) + y*y) : 2.0 * 2.0 / ((1+x)*(1+x) + y*y) ;
   sos_coeffs[0] = 1.0 / gain ;
   sos_coeffs[1] = low_pass ? 2.0 / gain : -2.0 / gain ;
   sos_coeffs[2] = 1.0 / gain ;
   sos_coeffs[3] = 1.0 ;
   sos_coeffs[4] = -2.0 * x ;
   sos_coeffs[5] = x*x + y*y ;
+  //Serial.printf ("2nd order %f %f %f %f %f %f\n", sos_coeffs[0], sos_coeffs[1], sos_coeffs[2], sos_coeffs[3], sos_coeffs[4], sos_coeffs[5]) ;
 }
 
 
@@ -369,16 +340,16 @@ void AudioFilterCrossover::update (void)
   for (unsigned int i = 0 ; i < stages ; i++)
   {
     arm_copy_f32 (left_samples, saved_samples, AUDIO_BLOCK_SAMPLES) ;
-    apply_filter (specs[2*i+1], left_samples) ;         // high pass for stage
+    apply_filter (specs[2*i+1], left_samples, false) ;         // high pass for stage
     output_to_block (2*i, left_samples) ;               // output it
     arm_copy_f32 (saved_samples, left_samples, AUDIO_BLOCK_SAMPLES) ;
-    apply_filter (specs[2*i], left_samples) ;           // low pass for stage - retain for next stage
+    apply_filter (specs[2*i], left_samples, false) ;           // low pass for stage - retain for next stage
 
     arm_copy_f32 (right_samples, saved_samples, AUDIO_BLOCK_SAMPLES) ;
-    apply_filter (specs[2*i+1], right_samples) ;        // high pass for stage
+    apply_filter (specs[2*i+1], right_samples, true) ;        // high pass for stage
     output_to_block (2*i+1, right_samples) ;            // output it
     arm_copy_f32 (saved_samples, right_samples, AUDIO_BLOCK_SAMPLES) ;
-    apply_filter (specs[2*i], right_samples) ;          // low pass for stage - retain for next stage
+    apply_filter (specs[2*i], right_samples, true) ;          // low pass for stage - retain for next stage
   }
 
   output_to_block (2*stages,   left_samples) ;          // at end output the last, lowest frequency
