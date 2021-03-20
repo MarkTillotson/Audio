@@ -64,7 +64,6 @@ private:
   float sos_state2 [2 * FILTERSPEC_MAX_SOS_SECTIONS] ;
 
   void initialize (unsigned int _sos_count, float * _sos_coeffs) ;
-  void sos_apply (float * state, float * coeffs, int n, float * samples) ;
 };
 
 

@@ -46,37 +46,102 @@ void FilterSpecIIR::initialize (unsigned int _sos_count, float * _sos_coeffs)
 }
 
 
-void FilterSpecIIR::apply (int n, float * samples, bool alt_state)
-{
-  for (unsigned int i = 0 ; i < sos_count ; i++)
-    sos_apply ((alt_state ? sos_state2 : sos_state) + 2*i, sos_coeffs + 6*i, n, samples) ;
-}
 
-
-void FilterSpecIIR::sos_apply (float * state, float * coeffs, int n, float * samples)
+static void sos_apply (float * state, float * coeffs, int n, float * samples)
 {
-  float a0 =     coeffs[0], a1 = coeffs[1], a2 = coeffs[2] ;
-  float b0 = 1.0/coeffs[3], b1 = coeffs[4], b2 = coeffs[5] ;
+  const float gain =   coeffs[0], a1 = coeffs[1], a2 = coeffs[2] ;
+  const float b0 = 1.0/coeffs[3], b1 = coeffs[4], b2 = coeffs[5] ;
   float s1 = state[0], s2 = state[1] ;
 
-  for (int i = 0 ; i < n ; i++)
+  if (a1 == 2.0 && a2 == 1.0)
   {
-    float val = samples[i] ;
-    val -= b1 * s1 ;
-    val -= b2 * s2 ;
-    val *= b0 ;  // this coefficient we reciprocated already to avoid a division here.
-    float s0 = val ;
-    val *= a0 ;
-    val += a1 * s1 ;
-    val += a2 * s2 ;
-    samples[i] = val ;
-    s2 = s1 ;
-    s1 = s0 ;
+    for (int i = 0 ; i < n ; i+=2)
+    {
+      float val = samples[i] ;
+      float val2 = samples[i+1] ;
+      val -= b1 * s1 ;
+      val -= b2 * s2 ;
+      //val *= b0 ;  // this coefficient we reciprocated already to avoid a division here.
+      float s0 = val ;
+      val2 -= b1 * s0 ;
+      val2 -= b2 * s1 ;
+      float s00 = val2 ;
+      val += s1 ;
+      val += s1 ;
+      val += s2 ;
+      val2 += s0 ;
+      val2 += s0 ;
+      val2 += s1 ;
+      val *= gain ;
+      samples[i] = val ;
+      val2 *= gain ;
+      samples[i+1] = val2 ;
+      s2 = s0 ;
+      s1 = s00 ;
+    }
+  }
+  else if (a1 == -2.0 && a2 == 1.0)
+  {
+    for (int i = 0 ; i < n ; i+=2)
+    {
+      float val = samples[i] ;
+      float val2 = samples[i+1] ;
+      val -= b1 * s1 ;
+      val -= b2 * s2 ;
+      //val *= b0 ;  // this coefficient we reciprocated already to avoid a division here.
+      float s0 = val ;
+      val2 -= b1 * s0 ;
+      val2 -= b2 * s1 ;
+      float s00 = val2 ;
+      val -= s1 ;
+      val -= s1 ;
+      val += s2 ;
+      val2 -= s0 ;
+      val2 -= s0 ;
+      val2 += s1 ;
+      val *= gain ;
+      samples[i] = val ;
+      val2 *= gain ;
+      samples[i+1] = val2 ;
+      s2 = s0 ;
+      s1 = s00 ;
+    }
+  }
+  else
+  {
+    for (int i = 0 ; i < n ; i+=2)
+    {
+      float val = samples[i] ;
+      float val2 = samples[i+1] ;
+      val -= b1 * s1 ;
+      val -= b2 * s2 ;
+      //val *= b0 ;  // this coefficient we reciprocated already to avoid a division here.
+      float s0 = val ;
+      val2 -= b1 * s0 ;
+      val2 -= b2 * s1 ;
+      float s00 = val2 ;
+      val += a1 * s1 ;
+      val += a2 * s2 ;
+      val2 += a1 * s0 ;
+      val2 += a2 * s1 ;
+      val *= gain ;
+      samples[i] = val ;
+      val2 *= gain ;
+      samples[i+1] = val2 ;
+      s2 = s0 ;
+      s1 = s00 ;
+    }
   }
   state[0] = s1 ;
   state[1] = s2 ;
 }
 
+
+void FilterSpecIIR::apply (int n, float * samples, bool alt_state)
+{
+  for (unsigned int i = 0 ; i < sos_count ; i++)
+    sos_apply ((alt_state ? sos_state2 : sos_state) + 2*i, sos_coeffs + 6*i, n, samples) ;
+}
 
 void AudioFilterCrossover::input_from_block (audio_block_t * block, float * samples)
 {
@@ -122,7 +187,7 @@ static void bilinear_z_transform (float * s)
 
 static void get_butterworth_poles (float f, int order, float * poles)
 {
-  float omega = M_PI * f ;
+  float omega = tan (M_PI * f) ;
   if (order & 1)
   {
     *poles++ = -omega ;
@@ -152,7 +217,7 @@ static void sos_coeffs_for_1st_order (float * sos_coeffs, float x, bool low_pass
 {
   float gain = low_pass ? 2.0 / (1-x) : 2.0 / (1+x) ;
   sos_coeffs[0] = 1.0 / gain ;
-  sos_coeffs[1] = low_pass ? 1.0 / gain : -1.0 / gain ;
+  sos_coeffs[1] = low_pass ? 1.0 : -1.0 ;
   sos_coeffs[2] = 0.0 ;
   sos_coeffs[3] = 1.0 ;
   sos_coeffs[4] = -x ;
@@ -164,8 +229,8 @@ static void sos_coeffs_for_squared_1st_order (float * sos_coeffs, float x, bool 
 {
   float gain = low_pass ? 2.0 * 2.0 / ((1-x)*(1-x)) : 2.0 * 2.0 / ((1+x)*(1+x)) ;
   sos_coeffs[0] = 1.0 / gain ;
-  sos_coeffs[1] = low_pass ? 2.0 / gain : -2.0 / gain ;
-  sos_coeffs[2] = 1.0 / gain ;
+  sos_coeffs[1] = low_pass ? 2.0 : -2.0 ;
+  sos_coeffs[2] = 1.0 ;
   sos_coeffs[3] = 1.0 ;
   sos_coeffs[4] = -2.0 * x ;
   sos_coeffs[5] = x*x ;
@@ -176,8 +241,8 @@ static void sos_coeffs_for_2nd_order (float * sos_coeffs, float x, float y, bool
 {
   float gain = low_pass ? 2.0 * 2.0 / ((1-x)*(1-x) + y*y) : 2.0 * 2.0 / ((1+x)*(1+x) + y*y) ;
   sos_coeffs[0] = 1.0 / gain ;
-  sos_coeffs[1] = low_pass ? 2.0 / gain : -2.0 / gain ;
-  sos_coeffs[2] = 1.0 / gain ;
+  sos_coeffs[1] = low_pass ? 2.0 : -2.0 ;
+  sos_coeffs[2] = 1.0 ;
   sos_coeffs[3] = 1.0 ;
   sos_coeffs[4] = -2.0 * x ;
   sos_coeffs[5] = x*x + y*y ;
@@ -249,6 +314,7 @@ FilterSpec * AudioFilterCrossover::crossover_lowpass_for (float freq, int crosso
 	  index += 6 ;
 	}
       }
+      Serial.printf ("LINK low %i\n", index) ;
       return new FilterSpecIIR (order / 2, sos_coeffs) ;
     }
     break ;
@@ -320,6 +386,7 @@ FilterSpec * AudioFilterCrossover::crossover_highpass_for (float freq, int cross
 	  index += 6 ;
 	}
       }
+      Serial.printf ("LINK high %i\n", index) ;
       return new FilterSpecIIR (order / 2, sos_coeffs) ;
     }
     break ;
