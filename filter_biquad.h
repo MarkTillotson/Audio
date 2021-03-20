@@ -53,6 +53,7 @@ public:
 
 	// Compute common filter functions
 	// http://www.musicdsp.org/files/Audio-EQ-Cookbook.txt
+	// link update: https://music.columbia.edu/pipermail/music-dsp/2001-March/041752.html
 	void setLowpass(uint32_t stage, float frequency, float q = 0.7071) {
 		int coef[5];
 		double w0 = frequency * (2 * 3.141592654 / AUDIO_SAMPLE_RATE_EXACT);
