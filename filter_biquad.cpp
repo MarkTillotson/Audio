@@ -74,7 +74,6 @@ void AudioFilterBiquad::update(void)
 			//  TODO: is logical AND really correct, or maybe it
 			//        should really be signed_saturate_rshift() ???
 			sum &= 0x3FFF;
-			bprev = in2;
 			*data++ = aprev;
 		} while (data < end);
 		flag = *state & 0x80000000;
