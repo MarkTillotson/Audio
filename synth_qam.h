@@ -76,7 +76,7 @@ private:
 
   
   volatile bool active;
-  int order, bits ;
+  int order, N ;
   bool root_raised ;
   long sample_number ;
   float symbol_freq;

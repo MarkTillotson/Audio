@@ -40,20 +40,28 @@ void AudioSynthQAM::setup (int _order, float _symbol_freq, float _beta, int _sou
   }
   order = _order ;
   if (order == 4)
-    bits = 1 ;
+    N = 2 ;
+  else if (order == 9)
+    N = 3 ;
   else if (order == 16)
-    bits = 2 ;
+    N = 4 ;
+  else if (order == 25)
+    N = 5 ;
+  else if (order == 36)
+    N = 6 ;
   else if (order == 64)
-    bits = 3 ;
+    N = 8 ;
+  else if (order == 144)
+    N = 12 ;
   else if (order == 256)
-    bits = 4 ;
+    N = 16 ;
   symbol_freq = _symbol_freq ;
   beta = _beta ;
   source = _source ;
 
   // calculate oversampling, points per symbol, etc
   points_per_symbol = AUDIO_SAMPLE_RATE_EXACT / symbol_freq ;
-  int wanted_points = 4 * int (round (sqrt (order))) ;
+  int wanted_points = 4 * int (round (sqrt (order))) ;  // 4 is a magic guess
   if (wanted_points > points_per_symbol)
   {
     oversampling = int (wanted_points / points_per_symbol) + 1 ;
@@ -199,8 +207,6 @@ void AudioSynthQAM::update (void)
     return ;
   }
 
-  int N = 1<<bits ;
-
   for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES ; i++)
   {
     phase += phase_step ;
@@ -213,12 +219,12 @@ void AudioSynthQAM::update (void)
       // generate new symbols here
       int binary ;
       if (source == QAM_SOURCE_RAMP)
-	binary = sample_number & (N*N - 1) ;
+	binary = sample_number % (N*N) ;
       else if (source == QAM_SOURCE_RAND)
 	binary = random (N*N) ;
 
-      int i_val = binary >> bits ;
-      int q_val = binary - (i_val << bits) ;
+      int i_val = binary / N ;
+      int q_val = binary % N ;
       float i_value = i_val;
       float q_value = q_val;
       i_value -= (N - 1.0) / 2 ;
