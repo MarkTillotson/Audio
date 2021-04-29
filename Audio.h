@@ -137,5 +137,6 @@
 #include "synth_simple_drum.h"
 #include "synth_pwm.h"
 #include "synth_wavetable.h"
+#include "synth_qam.h"
 
 #endif
