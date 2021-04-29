@@ -55,6 +55,8 @@ void AudioSynthQAM::setup (int _order, float _symbol_freq, float _beta, int _sou
     N = 12 ;
   else if (order == 256)
     N = 16 ;
+  else if (order == 1024)
+    N = 32 ;
   symbol_freq = _symbol_freq ;
   beta = _beta ;
   source = _source ;
