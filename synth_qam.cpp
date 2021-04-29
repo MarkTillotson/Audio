@@ -70,15 +70,19 @@ void AudioSynthQAM::setup (int _order, float _symbol_freq, float _beta, int _sou
     
   wavl_size = 2 * half_points - 1 ;
   table = new float [wavl_size] ;
+  Serial.printf ("table size %i\n", wavl_size) ;
 
   gen_root_raised_impulse (table, 1.0, 1.0 / points_per_symbol, wavl_size) ;
 
+  /*
   for (int i = 0 ; i < wavl_size ; i++)
     Serial.println (table[i]) ;
-
+  */
+  
   max_states = int (wavl_size / oversampling) + 1 ;
   I_states = new struct PAM_wavelet_state [max_states] ;
   Q_states = new struct PAM_wavelet_state [max_states] ;
+  Serial.printf ("states %i, overs %i\n", max_states, oversampling) ;
   i_ins = i_del = 0 ;
   q_ins = q_del = 0 ;
 
@@ -126,7 +130,7 @@ void AudioSynthQAM::gen_root_raised_impulse (float * arr, float Ts, float t, int
   for (int i = 0 ; i < n ; i++)
   {
     float x = i + 0.5 - half ;
-    arr [i] = gen_raised_cosine (x*t, Ts) ;  // root raised?
+    arr [i] = gen_root_raised_cosine (x*t, Ts) ;  // can use gen_raised_cosine here for loopback testing
   }
 }
 
@@ -198,20 +202,23 @@ void AudioSynthQAM::update (void)
       int index = int (round (fraction)) ;
 
       // generate new symbols here
+      int binary ;
       if (source == QAM_SOURCE_RAMP)
-      {
-	int binary = sample_number & (N*N - 1) ;
-	int i_val = binary >> bits ;
-	int q_val = binary - (i_val << bits) ;
-	float i_value = i_val;
-	float q_value = q_val;
-	i_value -= (N - 1.0) / 2 ;
-	q_value -= (N - 1.0) / 2 ;
-	i_value /= N ;
-	q_value /= N ;
-	add_state (I_states, i_value/2, index, i_ins) ;
-	add_state (Q_states, q_value/2, index, q_ins) ;
-      }
+	binary = sample_number & (N*N - 1) ;
+      else if (source == QAM_SOURCE_LFSR)
+	binary = random (N*N) ;
+
+      int i_val = binary >> bits ;
+      int q_val = binary - (i_val << bits) ;
+      float i_value = i_val;
+      float q_value = q_val;
+      i_value -= (N - 1.0) / 2 ;
+      q_value -= (N - 1.0) / 2 ;
+      i_value /= N ;
+      q_value /= N ;
+      add_state (I_states, i_value, index, i_ins) ;
+      add_state (Q_states, q_value, index, q_ins) ;
+
       sample_number ++ ;
     }
 
