@@ -52,6 +52,7 @@ public:
     beta (0.5),
     source (QAM_SOURCE_LFSR)
   {
+    sample_number = 0 ;
     active = false ;
     setup (16, 11050, 0.5, QAM_SOURCE_LFSR) ;
   }
@@ -61,15 +62,18 @@ public:
   virtual void update(void);
 
 private:
-  float process_active_states (struct PAM_wavelet_state * array, int ins, int del) ;
+  float process_active_states (struct PAM_wavelet_state * array, int ins, int & del) ;
+  void add_state (struct PAM_wavelet_state * array, float scale, int offset, int & ins) ;
   inline bool state_dead (struct PAM_wavelet_state * state) ;
   inline float process_active_state (struct PAM_wavelet_state * state) ;
   void gen_root_raised_impulse (float * arr, float Ts, float t, int n) ;
-  float root_raised_cosine (float t, float Ts);
+  float gen_root_raised_cosine (float t, float Ts);
+  float gen_raised_cosine (float t, float Ts);
 
   
   volatile bool active;
-  int order ;
+  int order, bits ;
+  long sample_number ;
   float symbol_freq;
   float beta;
   int source;
