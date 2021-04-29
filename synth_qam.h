@@ -31,16 +31,17 @@
 #define QAM_SOURCE_LFSR 0
 #define QAM_SOURCE_RAMP 1
 #define QAM_SOURCE_FN   2
+#define QAM_SOURCE_RAND 3
 
 #include <Arduino.h>
 #include "AudioStream.h"
 #include "arm_math.h"
 
-typedef struct PAM_wavelet_state
+typedef struct QAM_wavelet_state
 {
   int offset ;
-  float scale ;
-} PAM_wavelet_state ;
+  float i_scale, q_scale ;
+} QAM_wavelet_state ;
 
 
 class AudioSynthQAM : public AudioStream
@@ -54,25 +55,29 @@ public:
   {
     sample_number = 0 ;
     active = false ;
+    root_raised = true ;
     setup (16, 11050, 0.5, QAM_SOURCE_LFSR) ;
   }
 
   void setup (int _order, float _symbol_freq, float _beta, int _source);
+
+  void set_loopback (bool lb);
   
   virtual void update(void);
 
 private:
-  float process_active_states (struct PAM_wavelet_state * array, int ins, int & del) ;
-  void add_state (struct PAM_wavelet_state * array, float scale, int offset, int & ins) ;
-  inline bool state_dead (struct PAM_wavelet_state * state) ;
-  inline float process_active_state (struct PAM_wavelet_state * state) ;
-  void gen_root_raised_impulse (float * arr, float Ts, float t, int n) ;
+  void process_active_states (float & i_sum, float & q_sum) ;
+  void add_state (float i_scale, float q_scale, int offset) ;
+  inline bool state_dead (struct QAM_wavelet_state * state) ;
+  inline void process_active_state (float & i_sum, float & q_sum, struct QAM_wavelet_state * state) ;
+  void gen_impulse_response (float * arr, float Ts, float t, int n) ;
   float gen_root_raised_cosine (float t, float Ts);
   float gen_raised_cosine (float t, float Ts);
 
   
   volatile bool active;
   int order, bits ;
+  bool root_raised ;
   long sample_number ;
   float symbol_freq;
   float beta;
@@ -83,10 +88,8 @@ private:
   int wavl_size;
 
   int max_states ;
-  struct PAM_wavelet_state * I_states;
-  int i_ins, i_del ;
-  struct PAM_wavelet_state * Q_states;
-  int q_ins, q_del ;
+  int ins, del ;
+  struct QAM_wavelet_state * states;
 
   float * table ;
 };

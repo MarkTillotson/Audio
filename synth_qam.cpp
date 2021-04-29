@@ -36,8 +36,7 @@ void AudioSynthQAM::setup (int _order, float _symbol_freq, float _beta, int _sou
   {
     active = false ;
     delete [] table ;
-    delete [] I_states ;
-    delete [] Q_states ;
+    delete [] states ;
   }
   order = _order ;
   if (order == 4)
@@ -72,7 +71,7 @@ void AudioSynthQAM::setup (int _order, float _symbol_freq, float _beta, int _sou
   table = new float [wavl_size] ;
   Serial.printf ("table size %i\n", wavl_size) ;
 
-  gen_root_raised_impulse (table, 1.0, 1.0 / points_per_symbol, wavl_size) ;
+  gen_impulse_response (table, 1.0, 1.0 / points_per_symbol, wavl_size) ;
 
   /*
   for (int i = 0 ; i < wavl_size ; i++)
@@ -80,23 +79,22 @@ void AudioSynthQAM::setup (int _order, float _symbol_freq, float _beta, int _sou
   */
   
   max_states = int (wavl_size / oversampling) + 1 ;
-  I_states = new struct PAM_wavelet_state [max_states] ;
-  Q_states = new struct PAM_wavelet_state [max_states] ;
+  states = new struct QAM_wavelet_state [max_states] ;
   Serial.printf ("states %i, overs %i\n", max_states, oversampling) ;
-  i_ins = i_del = 0 ;
-  q_ins = q_del = 0 ;
+  ins = del = 0 ;
 
   active = true;
 }
 
-float AudioSynthQAM::process_active_states (struct PAM_wavelet_state * array, int ins, int & del)
+void AudioSynthQAM::process_active_states (float & i_sum, float & q_sum)
 {
-  float value = 0.0 ;
+  i_sum = 0.0 ;
+  q_sum = 0.0 ;
   int p = del ;
   while (p != ins)
   {
-    value += process_active_state (array + p) ;
-    if (state_dead (array + p) && p == del)
+    process_active_state (i_sum, q_sum, states + p) ;
+    if (state_dead (states + p) && p == del)
     {
       del += 1 ;
       if (del >= max_states)
@@ -106,33 +104,43 @@ float AudioSynthQAM::process_active_states (struct PAM_wavelet_state * array, in
     if (++p >= max_states)
       p = 0 ;
   }
-
-  return value ;
 }
 
-inline bool AudioSynthQAM::state_dead (struct PAM_wavelet_state * state)
+inline bool AudioSynthQAM::state_dead (struct QAM_wavelet_state * state)
 {
   return state->offset >= wavl_size ;
 }
   
 
-inline float AudioSynthQAM::process_active_state (struct PAM_wavelet_state * state)
+inline void AudioSynthQAM::process_active_state (float & i_sum, float & q_sum, struct QAM_wavelet_state * state)
 {
   int off = state->offset ;
   float val = table [off] ;
   state->offset = off + oversampling ;
-  return state->scale * val ;
+  i_sum += state->i_scale * val ;
+  q_sum += state->q_scale * val ;
 }
 
-void AudioSynthQAM::gen_root_raised_impulse (float * arr, float Ts, float t, int n)
+void AudioSynthQAM::gen_impulse_response (float * arr, float Ts, float t, int n)
 {
   int half = n/2 ;
   for (int i = 0 ; i < n ; i++)
   {
     float x = i + 0.5 - half ;
-    arr [i] = gen_root_raised_cosine (x*t, Ts) ;  // can use gen_raised_cosine here for loopback testing
+    if (root_raised)
+      arr [i] = gen_root_raised_cosine (x*t, Ts) ;
+    else
+      arr [i] = gen_raised_cosine (x*t, Ts) ;  // for loopback tests
   }
 }
+
+void AudioSynthQAM::set_loopback (bool lb)
+{
+  root_raised = !lb ;
+  if (active)
+    gen_impulse_response (table, 1.0, 1.0 / points_per_symbol, wavl_size) ;
+}
+
 
 float AudioSynthQAM::gen_root_raised_cosine (float t, float Ts)
 {
@@ -166,10 +174,11 @@ float AudioSynthQAM::gen_raised_cosine (float t, float Ts)
   return (1 / Ts) * sinc (x) * cos (M_PI * beta * x) / (1 - disc*disc) ;
 }
 
-void AudioSynthQAM::add_state (struct PAM_wavelet_state * array, float scale, int offset, int & ins)
+void AudioSynthQAM::add_state (float i_scale, float q_scale, int offset)
 {
-  array [ins].scale = scale ;
-  array [ins].offset = offset ;
+  states [ins].i_scale = i_scale ;
+  states [ins].q_scale = q_scale ;
+  states [ins].offset = offset ;
   ins ++ ;
   if (ins >= max_states)
     ins = 0 ;
@@ -205,7 +214,7 @@ void AudioSynthQAM::update (void)
       int binary ;
       if (source == QAM_SOURCE_RAMP)
 	binary = sample_number & (N*N - 1) ;
-      else if (source == QAM_SOURCE_LFSR)
+      else if (source == QAM_SOURCE_RAND)
 	binary = random (N*N) ;
 
       int i_val = binary >> bits ;
@@ -216,15 +225,14 @@ void AudioSynthQAM::update (void)
       q_value -= (N - 1.0) / 2 ;
       i_value /= N ;
       q_value /= N ;
-      add_state (I_states, i_value, index, i_ins) ;
-      add_state (Q_states, q_value, index, q_ins) ;
+      add_state (i_value, q_value, index) ;
 
       sample_number ++ ;
     }
 
-    float i_sample = process_active_states (I_states, i_ins, i_del) ;
+    float i_sample, q_sample ;
+    process_active_states (i_sample, q_sample) ;
     I_blk->data [i] = int (round (32767.0 * i_sample)) ;
-    float q_sample = process_active_states (Q_states, q_ins, q_del) ;
     Q_blk->data [i] = int (round (32767.0 * q_sample)) ;
   }
 
