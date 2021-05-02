@@ -33,102 +33,87 @@ static int   graycode   [4]  = { 0, 1, 3, 2 } ;
 static float phasetable [10] = { 1.0, SQRTH, 0.0, -SQRTH, -1.0, -SQRTH, 0.0, SQRTH, 1.0, SQRTH } ;
 
 
-void AudioSynthOFDM::get_samples (void)
+void AudioAnalyzeOFDM::demodulate (void)
 {
-  // setup complex freq entries
-  samples[0].real = 0 ;
-  samples[0].imag = 0 ;
-  samples[512].real = 0 ;
-  samples[512].imag = 0 ;
+  // FFT
+  arm_cfft_radix4_f32 (&cfft_inst, (float *) samples);
+  
   int vecind = 0 ;
   int vecshft = 0 ;
-#if OFDM_TEST_MODE
-  float prescale = 40.0 ;
-  for (int i = 0 ; i < 1 ; i++)
-#else
-  float prescale = 8.0 ;
-  for (int i = 0 ; i < OFDM_CHANNELS ; i++)
-#endif
-  {
-    // get next two data bits for this channel
-    int bits = graycode [(data_vector[vecind] >> vecshft) & 3] ;
 
-    // delta the phasecode by +3, +1, -1, -3 depending on the gray coded bits - "pi/4 DQPSK"
-    int phasecode = (phasecodes[i] + 2*bits - 3) & 7 ;
-    phasecodes [i] = phasecode ;
+  if (first_block)
+  {
+    for (int i = 0 ; i < OFDM_CHANNELS ; i++)
+    {
+      float real = samples [i+1].real ;
+      float imag = samples [i+1].imag ;
+      float phase = atan2 (imag, real) ;
+      phases [i] = phase ;
+    }
+    first_block = false ;
+  }
+
+  for (int i = 0 ; i < OFDM_CHANNELS ; i++)
+  {
+    float real = samples [i+1].real ;
+    float imag = samples [i+1].imag ;
+    float phase = atan2 (imag, real) ;
+    float phase_diff = phase - phases [i] ;
+    phase_diff = - phase_diff ;
+    phases [i] = phase ;
+    while (phase_diff < -M_PI) phase_diff += 2*M_PI ;
+    while (phase_diff >= M_PI) phase_diff -= 2*M_PI ;
+    int bits ;
+    if (phase_diff >= 0)
+      bits = phase_diff > M_PI/2 ? 2 : 3 ;
+    else
+      bits = phase_diff < -M_PI/2 ? 0 : 1 ;
+
+    if (vecshft == 0)
+      data_vector[vecind] = bits ;
+    else
+      data_vector[vecind] |= bits << vecshft ;
 
     // step to next pair of databits for next time
     vecshft = (vecshft + 2) & 6 ;
     if (vecshft == 0)
       vecind ++ ;
-    
-    float real = prescale * (phasetable [phasecode]) ;   // cos
-    float imag = prescale * (phasetable [phasecode+2]) ; // sin
-    samples [i+1].real = real ;       // positive freq entries
-    samples [i+1].imag = imag ;
-    samples [1024-(i+1)].real = real ;  // negative freq entries, conjugates.
-    samples [1024-(i+1)].imag = -imag ;
   }
-#if OFDM_TEST_MODE
-  for (int i = 2 ; i < 512 ; i++)
-#else
-  for (int i = OFDM_CHANNELS+1 ; i < 512 ; i++)
-#endif
-  {
-    samples [i].real = 0 ;
-    samples [i].imag = 0 ;
-    samples [1024-i].real = 0 ;
-    samples [1024-i].imag = 0 ;
-  }
-  // perform inverse FFT to get sample data
-  arm_cfft_radix4_f32 (&cfft_inst, (float *) samples);
 }
 
 
-void AudioSynthOFDM::update(void)
+void AudioAnalyzeOFDM::update(void)
 {
-  audio_block_t * block = allocate() ;
+  audio_block_t * block = receiveReadOnly (0) ;
   if (block == NULL)
     return;
 
   int16_t * p = block->data ;
   int16_t * end = p + AUDIO_BLOCK_SAMPLES;
   unsigned int index = AUDIO_BLOCK_SAMPLES * ((segment + 7) & 7) ;  // index into the ifft output
-  unsigned int ind2 ;
 
   switch (segment)
   {
-  case 0:  // raised cosine fade-in
-    get_samples () ;
-    
-    ind2 = 0 ;
-    do
-    {
-      *p++ = int (round (32767 * samples[index++].real * raised_cosine[ind2++])) ;
-    } while (p < end) ;
+  case 0: // fade in period
     segment ++ ;
     break ;
 
-  case 9:  // raised cosine fade-out
-    datasource (data_vector) ;  // in time for next set of samples
-
-    ind2 = AUDIO_BLOCK_SAMPLES-1 ;
-    do
-    {
-      *p++ = int (round (32767 * samples[index++].real * raised_cosine[ind2--])) ;
-    } while (p < end) ;
+  case 9: // fade out period
+    demodulate () ;
+    listener (data_vector) ;  // in time for next set of samples
     segment = 0 ;
     break ;
 
   default:  // body of block
     do
     {
-      *p++ = int (round (32767 * samples[index++].real)) ;
+      samples[index].real = (*p++) / 32767.0 ;
+      samples[index].imag = 0.0 ;
+      index ++ ;
     } while (p < end) ;
     segment ++ ;
     break ;
   }
   
-  transmit (block) ;
   release (block) ;
 }

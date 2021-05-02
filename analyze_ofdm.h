@@ -29,6 +29,51 @@
 
 #include "Arduino.h"
 #include "AudioStream.h"
+#include "arm_math.h"
+
+
+struct ofdm_complex
+{
+  float real ;
+  float imag ;
+} ;
+
+#define OFDM_BW       11050.0
+#define OFDM_CHANNELS (int (1024 * OFDM_BW / AUDIO_SAMPLE_RATE_EXACT))
+
+static void ofdm_null_listener (byte * vec)
+{}
+
+class AudioAnalyzeOFDM : public AudioStream
+{
+ public:
+  AudioAnalyzeOFDM(void) : AudioStream (1, inputQueueArray)
+  {
+    segment = 0 ;
+    listener = ofdm_null_listener ;
+    arm_cfft_radix4_init_f32 (&cfft_inst, 1024, 0, 1) ;  // initialize for forward FFT with bit reverse
+    first_block = true ;
+  }
+
+  void set_listener (void (*_listener) (byte *))
+  {
+    listener = _listener ;
+  }
+
+  virtual void update (void);
+  
+ private:
+  void demodulate (void);
+  
+  audio_block_t * inputQueueArray[1];
+  unsigned int segment ;
+  struct ofdm_complex samples [1024] ;
+  byte data_vector [(OFDM_CHANNELS+3)/4] ;
+  float phases [OFDM_CHANNELS] ;   // can pack this better but its small compared to the complex vector
+  void (*listener) (byte *) ;
+  arm_cfft_radix4_instance_f32 cfft_inst;
+  bool first_block ;
+};
 
 #endif
 

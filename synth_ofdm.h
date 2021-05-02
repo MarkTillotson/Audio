@@ -29,16 +29,10 @@
 
 #include "Arduino.h"
 #include "AudioStream.h"
-//#include "utility/dspinst.h"
+#include "analyze_ofdm.h"
 #include "arm_math.h"
 
-#define OFDM_TEST_MODE 1
-
-struct complex
-{
-  float real ;
-  float imag ;
-} ;
+#define OFDM_TEST_MODE 0
 
 
 #define OFDM_BW       11050.0
@@ -52,7 +46,7 @@ static void ofdm_random_source (byte * vec)
 
 static void ofdm_test_source (byte * vec)
 {
-  vec [0] = 0x00 ;
+  vec [0] = 0x55 ;
 }
 
 class AudioSynthOFDM : public AudioStream
@@ -66,18 +60,11 @@ class AudioSynthOFDM : public AudioStream
 #else
     datasource = ofdm_random_source ;
 #endif
-    arm_cfft_radix4_init_f32 (&cfft_inst, 1024, 1, 1) ;
+    arm_cfft_radix4_init_f32 (&cfft_inst, 1024, 1, 1) ;  // initialize for inverse FFT with bitrev
     // taper function table
     for (int i = 0 ; i <= AUDIO_BLOCK_SAMPLES ; i++)
     {
       raised_cosine [i] = 0.5 * (1 - cos (M_PI * i / AUDIO_BLOCK_SAMPLES)) ;
-    }
-    Serial.printf ("raised cosine from %f to %f\n", raised_cosine[0], raised_cosine[AUDIO_BLOCK_SAMPLES]) ;
-    // clear all the (unused) channels
-    for (int i = 0 ; i < 1024 ; i++)
-    {
-      samples[i].real = 0.0 ;
-      samples[i].imag = 0.0 ;
     }
     // initialize phase codes to random initial state (data is phase differences between blocks)
     for (int i = 0 ; i < OFDM_CHANNELS ; i++)
@@ -90,7 +77,8 @@ class AudioSynthOFDM : public AudioStream
 
   void set_datasource (void (*fn) (byte *))
   {
-    datasource = fn ;
+    if (fn != NULL)
+      datasource = fn ;
   }
 
  private:
@@ -98,7 +86,7 @@ class AudioSynthOFDM : public AudioStream
   
   unsigned int segment ;
   float raised_cosine [AUDIO_BLOCK_SAMPLES+1] ;
-  struct complex samples [1024] ;
+  struct ofdm_complex samples [1024] ;
   byte data_vector [(OFDM_CHANNELS+3)/4] ;
   byte phasecodes [OFDM_CHANNELS] ;   // can pack this better but its small compared to the complex vector
   void (*datasource) (byte *) ;
