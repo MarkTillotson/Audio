@@ -65,6 +65,7 @@
 #include "analyze_notefreq.h"
 #include "analyze_peak.h"
 #include "analyze_rms.h"
+#include "analyze_ofdm.h"
 #include "async_input_spdif3.h"
 #include "control_sgtl5000.h"
 #include "control_wm8731.h"
@@ -137,5 +138,6 @@
 #include "synth_simple_drum.h"
 #include "synth_pwm.h"
 #include "synth_wavetable.h"
+#include "synth_ofdm.h"
 
 #endif
