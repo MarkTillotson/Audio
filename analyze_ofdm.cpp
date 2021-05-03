@@ -92,6 +92,39 @@ void AudioAnalyzeOFDM::update(void)
   int16_t * end = p + AUDIO_BLOCK_SAMPLES;
   unsigned int index = AUDIO_BLOCK_SAMPLES * ((segment + 7) & 7) ;  // index into the ifft output
 
+  // fist cut of synchronization, do rms calcs over 16 sample blocks, sum over 32 sample blocks, take log
+  // and stick out on the test stream
+  audio_block_t * rms = allocate() ;
+  if (rms != NULL)
+  {
+    int16_t * rmsdata = rms->data ;
+    for (int i = 0 ; i < AUDIO_BLOCK_SAMPLES>>4 ; i++)
+    {
+      uint32_t sum = 0 ;
+      for (int j = 0 ; j < 16 ; j++)
+      {
+	int32_t sqr = *p++ ;
+	sqr *= sqr ;
+	sum += (sqr >> 4) ;
+      }
+      sq_sums [i] = sum ;
+      sum = 0 ;
+      for (int j = 0 ; j < 2 ; j++)
+	sum += sq_sums [(64 + i - j) % (AUDIO_BLOCK_SAMPLES>>4)] ;
+      int16_t sqmag = (int16_t) (sum >> 15) ;
+      sqmag = int (log (sqmag+1) * 3000) ;
+
+      for (int j = 0 ; j < 16 ; j+=2)
+      {
+	*rmsdata++ = sqmag ;
+	*rmsdata++ = -sqmag ;
+      }
+    }
+    transmit (rms, 0) ;
+    release (rms) ;
+    p = block->data ;
+  }
+
   switch (segment)
   {
   case 0: // fade in period

@@ -73,6 +73,7 @@ class AudioAnalyzeOFDM : public AudioStream
   void (*listener) (byte *) ;
   arm_cfft_radix4_instance_f32 cfft_inst;
   bool first_block ;
+  uint32_t sq_sums [AUDIO_BLOCK_SAMPLES>>4] ;
 };
 
 #endif
