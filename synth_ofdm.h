@@ -35,12 +35,12 @@
 #define OFDM_TEST_MODE 0
 
 
-#define OFDM_BW       11050.0
-#define OFDM_CHANNELS (int (1024 * OFDM_BW / AUDIO_SAMPLE_RATE_EXACT))
+//#define OFDM_BW       11050.0
+//#define OFDM_CHANNELS (int (1024 * OFDM_BW / AUDIO_SAMPLE_RATE_EXACT))
 
 static void ofdm_random_source (byte * vec)
 {
-  for (int i = 0 ; i < (OFDM_CHANNELS+3)/4 ; i++)
+  for (unsigned int i = 0 ; i < (OFDM_CHANNELS+3)/4 ; i++)
     vec[i] = random (0x100) ;
 }
 
@@ -62,14 +62,14 @@ class AudioSynthOFDM : public AudioStream
 #endif
     arm_cfft_radix4_init_f32 (&cfft_inst, 1024, 1, 1) ;  // initialize for inverse FFT with bitrev
     // taper function table
-    for (int i = 0 ; i <= AUDIO_BLOCK_SAMPLES ; i++)
+    for (unsigned int i = 0 ; i <= AUDIO_BLOCK_SAMPLES ; i++)
     {
       raised_cosine [i] = 0.5 * (1 - cos (M_PI * i / AUDIO_BLOCK_SAMPLES)) ;
     }
     // initialize phase codes to random initial state (data is phase differences between blocks)
-    for (int i = 0 ; i < OFDM_CHANNELS ; i++)
+    for (unsigned int i = 0 ; i < OFDM_CHANNELS ; i++)
     {
-      phasecodes [i] = random (8) ;
+      phasecodes [i] = (i + random (8)) & 7 ;
     }
   }
 

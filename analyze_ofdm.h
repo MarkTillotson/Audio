@@ -49,7 +49,9 @@ class AudioAnalyzeOFDM : public AudioStream
  public:
   AudioAnalyzeOFDM(void) : AudioStream (1, inputQueueArray)
   {
-    segment = 0 ;
+    shifted = 0 ;
+    index = 0 ;
+    part_index = 0 ;
     listener = ofdm_null_listener ;
     arm_cfft_radix4_init_f32 (&cfft_inst, 1024, 0, 1) ;  // initialize for forward FFT with bit reverse
     first_block = true ;
@@ -60,13 +62,22 @@ class AudioAnalyzeOFDM : public AudioStream
     listener = _listener ;
   }
 
+  float get_pilot_phasediff (int n)
+  {
+    return pilot_pdiffavg[n] ;
+  }
+
+  int get_squonk (void) { return total_count ; }
+  int get_shifted (void) { return shifted ; }
+
   virtual void update (void);
   
  private:
   void demodulate (void);
   
   audio_block_t * inputQueueArray[1];
-  unsigned int segment ;
+  unsigned int index ;
+  unsigned int part_index ;
   struct ofdm_complex samples [1024] ;
   byte data_vector [(OFDM_CHANNELS+3)/4] ;
   float phases [OFDM_CHANNELS] ;   // can pack this better but its small compared to the complex vector
@@ -74,6 +85,11 @@ class AudioAnalyzeOFDM : public AudioStream
   arm_cfft_radix4_instance_f32 cfft_inst;
   bool first_block ;
   uint32_t sq_sums [AUDIO_BLOCK_SAMPLES>>4] ;
+  float pilot_pdiff [OFDM_CHANNELS / 64 + 1] ;
+  float pilot_pdiffavg [OFDM_CHANNELS / 64 + 1] ;
+  int total_count ;
+  struct ofdm_complex qam_maps [512] ;
+  unsigned int shifted ;
 };
 
 #endif
