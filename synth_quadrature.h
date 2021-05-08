@@ -1,5 +1,5 @@
-#ifndef __SYNTH_COUPLED_RESONATOR_H__
-#define __SYNTH_COUPLED_RESONATOR_H__
+#ifndef __SYNTH_QUADRATURE_H__
+#define __SYNTH_QUADRATURE_H__
 
 #include <Arduino.h>
 #include <AudioStream.h>
