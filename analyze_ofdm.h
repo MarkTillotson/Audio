@@ -38,8 +38,21 @@ struct ofdm_complex
   float imag ;
 } ;
 
-#define OFDM_BW       11050.0
-#define OFDM_CHANNELS (int (1024 * OFDM_BW / AUDIO_SAMPLE_RATE_EXACT))
+#define OFDM_FFTN     1024
+#define OFDM_FFTMSK   0x3FF
+#define GOLBITS_IN  12
+#define GOLBITS_OUT 23
+#define CHUNK_SIZE  16
+#define OFDM_BYTES_PER_BLOCK (GOLBITS_IN * CHUNK_SIZE / 8)
+
+// two channels for pilot tones, and one channel per pair of data bits
+#define CHANNELS_PER_CHUNK (CHUNK_SIZE/2 + 2)
+
+#define OFDM_CHANNELS      (CHANNELS_PER_CHUNK * GOLBITS_OUT)
+#define OFDM_CHANNEL_MIN   8
+#define OFDM_CHANNEL_MAX   (OFDM_CHANNEL_MIN + OFDM_CHANNELS - 1)
+//#define OFDM_BW       11050.0
+//#define OFDM_CHANNELS (int (OFDM_FFTN * OFDM_BW / AUDIO_SAMPLE_RATE_EXACT))
 
 static void ofdm_null_listener (byte * vec)
 {}
@@ -53,8 +66,13 @@ class AudioAnalyzeOFDM : public AudioStream
     index = 0 ;
     part_index = 0 ;
     listener = ofdm_null_listener ;
-    arm_cfft_radix4_init_f32 (&cfft_inst, 1024, 0, 1) ;  // initialize for forward FFT with bit reverse
+    arm_cfft_radix4_init_f32 (&cfft_inst, OFDM_FFTN, 0, 1) ;  // initialize for forward FFT with bit reverse
     first_block = true ;
+    for (unsigned int i = 0 ; i <= OFDM_CHANNEL_MAX / 64 ; i++)
+    {
+      pilot_pdiff [i] = 0 ;
+      pilot_pdiffavg [i] = 0 ;
+    }
   }
 
   void set_listener (void (*_listener) (byte *))
@@ -78,17 +96,17 @@ class AudioAnalyzeOFDM : public AudioStream
   audio_block_t * inputQueueArray[1];
   unsigned int index ;
   unsigned int part_index ;
-  struct ofdm_complex samples [1024] ;
-  byte data_vector [(OFDM_CHANNELS+3)/4] ;
-  float phases [OFDM_CHANNELS] ;   // can pack this better but its small compared to the complex vector
+  struct ofdm_complex samples [OFDM_FFTN] ;
+  byte data_vector [(OFDM_CHANNEL_MAX+1)/4] ;  // need to change for golay demod
+  float phases [OFDM_CHANNEL_MAX+1] ;   // can pack this better but its small compared to the complex vector
   void (*listener) (byte *) ;
   arm_cfft_radix4_instance_f32 cfft_inst;
   bool first_block ;
-  uint32_t sq_sums [AUDIO_BLOCK_SAMPLES>>4] ;
-  float pilot_pdiff [OFDM_CHANNELS / 64 + 1] ;
-  float pilot_pdiffavg [OFDM_CHANNELS / 64 + 1] ;
+  uint32_t sq_sums [OFDM_CHANNEL_MAX+1] ;
+  float pilot_pdiff [OFDM_CHANNEL_MAX / 64 + 1] ;
+  float pilot_pdiffavg [OFDM_CHANNEL_MAX / 64 + 1] ;
   int total_count ;
-  struct ofdm_complex qam_maps [512] ;
+  struct ofdm_complex qam_maps [OFDM_FFTN/2] ;
   unsigned int shifted ;
 };
 

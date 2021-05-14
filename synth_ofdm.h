@@ -32,21 +32,31 @@
 #include "analyze_ofdm.h"
 #include "arm_math.h"
 
-#define OFDM_TEST_MODE 0
+/*
+#define OFDM_FFTN    1024
+#define OFDM_FFTMSK  0x3FF
+#define GOLBITS_IN  12
+#define GOLBITS_OUT 23
+#define CHUNK_SIZE  16
+#define OFDM_BYTES_PER_BLOCK (GOLBITS_IN * CHUNK_SIZE / 8)
 
+// two channels for pilot tones, and one channel per pair of data bits
+#define CHANNELS_PER_CHUNK (CHUNK_SIZE/2 + 2)
 
+#define OFDM_CHANNELS      (CHANNELS_PER_CHUNK * GOLBITS_OUT)
+#define OFDM_CHANNEL_MIN   8
+#define OFDM_CHANNEL_MAX   (OFDM_CHANNEL_MIN + OFDM_CHANNELS - 1)
+*/
 //#define OFDM_BW       11050.0
-//#define OFDM_CHANNELS (int (1024 * OFDM_BW / AUDIO_SAMPLE_RATE_EXACT))
+//#define OFDM_CHANNELS (int (OFDM_FFTN * OFDM_BW / AUDIO_SAMPLE_RATE_EXACT))
+
 
 static void ofdm_random_source (byte * vec)
 {
-  for (unsigned int i = 0 ; i < (OFDM_CHANNELS+3)/4 ; i++)
+  // NEED to change size of vec, split into golay blocks of 12 bits x CHUNK_SIZE
+  //for (unsigned int i = 0 ; i < (OFDM_CHANNELS+3)/4 ; i++)
+  for (unsigned int i = 0 ; i < OFDM_BYTES_PER_BLOCK ; i++)
     vec[i] = random (0x100) ;
-}
-
-static void ofdm_test_source (byte * vec)
-{
-  vec [0] = 0x55 ;
 }
 
 class AudioSynthOFDM : public AudioStream
@@ -55,22 +65,21 @@ class AudioSynthOFDM : public AudioStream
   AudioSynthOFDM() : AudioStream(0, NULL)
   {
     segment = 0 ;
-#if OFDM_TEST_MODE
-    datasource = ofdm_test_source ;
-#else
     datasource = ofdm_random_source ;
-#endif
-    arm_cfft_radix4_init_f32 (&cfft_inst, 1024, 1, 1) ;  // initialize for inverse FFT with bitrev
+    arm_cfft_radix4_init_f32 (&cfft_inst, OFDM_FFTN, 1, 1) ;  // initialize for inverse FFT with bitrev
     // taper function table
+    /*
     for (unsigned int i = 0 ; i <= AUDIO_BLOCK_SAMPLES ; i++)
     {
       raised_cosine [i] = 0.5 * (1 - cos (M_PI * i / AUDIO_BLOCK_SAMPLES)) ;
     }
+    */
     // initialize phase codes to random initial state (data is phase differences between blocks)
     for (unsigned int i = 0 ; i < OFDM_CHANNELS ; i++)
     {
       phasecodes [i] = (i + random (8)) & 7 ;
     }
+    debug = 1.0 ;
   }
 
   virtual void update(void);
@@ -83,14 +92,18 @@ class AudioSynthOFDM : public AudioStream
 
  private:
   void get_samples (void);
+  void set_channel (uint32_t chan, float real, float imag) ;
   
   unsigned int segment ;
-  float raised_cosine [AUDIO_BLOCK_SAMPLES+1] ;
-  struct ofdm_complex samples [1024] ;
-  byte data_vector [(OFDM_CHANNELS+3)/4] ;
-  byte phasecodes [OFDM_CHANNELS] ;   // can pack this better but its small compared to the complex vector
+  //float raised_cosine [AUDIO_BLOCK_SAMPLES+1] ;
+  struct ofdm_complex samples [OFDM_FFTN] ;
+  // NEED to change size of vec, split into golay blocks of 12 bits x CHUNK_SIZE
+  byte data_vector [OFDM_BYTES_PER_BLOCK] ;
+  byte phasecodes [OFDM_CHANNEL_MAX+1] ;   // can pack this better but its small compared to the complex vector
   void (*datasource) (byte *) ;
   arm_cfft_radix4_instance_f32 cfft_inst;
+
+  float debug = 1.0 ;
 };
 
 #endif
